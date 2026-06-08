@@ -82,6 +82,21 @@ function calculateCart() {
             hasDiscount: hasDiscount
         });
     });
+// ในฟังก์ชัน calculateCart ของ order.html
+if (pData && pData.promos && pData.promos.length > 0) {
+    const totalQty = productCounts[item.productId];
+    for (let promo of pData.promos) {
+        if (totalQty >= promo.min_quantity) {
+            if (promo.special_price > 0) {
+                currentPrice = promo.special_price;
+            } else if (promo.discount_amount > 0) {
+                total -= promo.discount_amount;
+                hasDiscount = true;
+            }
+            break;
+        }
+    }
+}
 
     return { total, finalItems };
 }
