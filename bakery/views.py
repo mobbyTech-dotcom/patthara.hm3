@@ -3,20 +3,41 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth import authenticate, login, logout
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
-from django.db.models import Sum, Count
+from django.db.models import Sum, Count, F, ExpressionWrapper, IntegerField as IntField
 from .models import Product, Order, OrderItem, PaymentInfo
 from .forms import ProductForm
 import json
 
+def get_products_json():
+    """Helper ดึงข้อมูลสินค้า, SKU และโปรโมชั่น เป็น JSON"""
+    products = Product.objects.filter(is_available=True).prefetch_related('skus', 'promotions')
+    data = {}
+    for p in products:
+        skus = list(p.skus.values('id', 'name', 'price'))
+        promos = list(p.promotions.order_by('-min_quantity').values('min_quantity', 'special_price'))
+        # ถ้าร้านยังไม่ได้ตั้ง SKU ให้ใช้สินค้าหลักเป็น 1 SKU อัตโนมัติ (กันระบบพัง)
+        if not skus:
+            skus = [{'id': f'p_{p.id}', 'name': 'ปกติ', 'price': p.price}]
+            
+        data[p.id] = {
+            'id': p.id,
+            'name': p.name,
+            'image': p.image.url if p.image else '',
+            'skus': skus,
+            'promos': promos
+        }
+    return json.dumps(data)
+
 
 def index(request):
     products = Product.objects.filter(is_available=True)
-    return render(request, 'bakery/index.html', {'products': products})
+    products_json = get_products_json()
+    return render(request, 'bakery/index.html', {'products': products, 'products_json': products_json})
 
 
 def order_page(request):
-    products = Product.objects.filter(is_available=True)
-    return render(request, 'bakery/order.html', {'products': products})
+    products_json = get_products_json()
+    return render(request, 'bakery/order.html', {'products_json': products_json})
 
 
 def create_order(request):
@@ -51,7 +72,6 @@ def order_receipt(request, order_number):
 
 
 def upload_slip(request, order_number):
-    """ลูกค้าอัปโหลดสลิป"""
     order = get_object_or_404(Order, order_number=order_number)
     if request.method == 'POST':
         slip = request.FILES.get('slip_image')
@@ -64,7 +84,6 @@ def upload_slip(request, order_number):
 
 
 def track_order(request):
-    """ลูกค้าติดตามสถานะออเดอร์"""
     order = None
     error = None
     if request.method == 'POST':
@@ -88,10 +107,8 @@ def login_view(request):
         password = request.POST.get('password')
         user = authenticate(request, username=username, password=password)
         if user is None:
-            # รหัสผ่านหรือชื่อผู้ใช้ผิด
             error = 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง'
         elif not user.is_staff:
-            # มี account แต่ยังไม่ได้รับสิทธิ์ staff
             error = 'บัญชีนี้ยังไม่มีสิทธิ์เข้าหลังบ้าน กรุณาติดต่อแอดมิน'
         else:
             login(request, user)
@@ -106,23 +123,16 @@ def logout_view(request):
 
 @login_required
 def admin_panel(request):
-    from django.db.models import F, ExpressionWrapper, IntegerField as IntField
     products = Product.objects.all()
     orders   = Order.objects.prefetch_related('items').all()
     form     = ProductForm()
     payment  = PaymentInfo.get_singleton()
 
-    # Badge: นับเฉพาะออเดอร์ที่ยังต้องจัดการ (ไม่รวม done)
-    active_orders_count = Order.objects.filter(
-        status__in=['pending', 'confirmed']
-    ).count()
-
-    # สรุปยอดขาย: เฉพาะออเดอร์ที่ done แล้ว
+    active_orders_count = Order.objects.filter(status__in=['pending', 'confirmed']).count()
     done_orders = Order.objects.filter(status='done')
     sales_total = done_orders.aggregate(total=Sum('total'))['total'] or 0
     done_count  = done_orders.count()
 
-    # สรุปจำนวนสินค้าแยกรายการ (price * quantity)
     product_summary_list = list(
         OrderItem.objects
         .filter(order__status='done')
@@ -149,6 +159,7 @@ def admin_panel(request):
         'done_count':           done_count,
         'product_summary':      product_summary_list,
     })
+
 
 @login_required
 @require_POST
@@ -199,7 +210,6 @@ def product_toggle(request, pk):
 @login_required
 @require_POST
 def order_update_status(request, order_id):
-    """แอดมินเปลี่ยนสถานะออเดอร์"""
     order  = get_object_or_404(Order, id=order_id)
     status = request.POST.get('status')
     if status in dict(Order.STATUS_CHOICES):
