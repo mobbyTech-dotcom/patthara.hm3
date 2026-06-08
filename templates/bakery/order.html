@@ -43,6 +43,7 @@ try { cart = JSON.parse(sessionStorage.getItem('patthara_cart') || '{}'); } catc
 
 function calculateCart() {
     let productCounts = {};
+    // นับจำนวนรวมของสินค้าแต่ละชนิด (รวมทุก SKU)
     Object.values(cart).forEach(item => {
         if (item.qty > 0) {
             productCounts[item.productId] = (productCounts[item.productId] || 0) + item.qty;
@@ -59,6 +60,7 @@ function calculateCart() {
         const pData = productsData[item.productId];
         let hasDiscount = false;
 
+        // ตรวจสอบโปรโมชั่น
         if (pData && pData.promos && pData.promos.length > 0) {
             const totalQty = productCounts[item.productId];
             for (let promo of pData.promos) {
