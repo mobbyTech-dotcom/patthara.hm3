@@ -4,7 +4,8 @@ from django.contrib.auth import authenticate, login, logout
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
 from django.db.models import Sum, Count, F, ExpressionWrapper, IntegerField as IntField
-# ⚠️ อย่าลืม Import ProductSKU และ Promotion เข้ามาด้วย
+
+# ⚠️ จุดสำคัญ: ต้องแน่ใจว่ามี ProductSKU และ Promotion อยู่ในบรรทัดนี้ครับ
 from .models import Product, Order, OrderItem, PaymentInfo, ProductSKU, Promotion
 from .forms import ProductForm
 import json
@@ -16,7 +17,7 @@ def get_products_json():
     for p in products:
         skus = list(p.skus.values('id', 'name', 'price'))
         promos = list(p.promotions.order_by('-min_quantity').values('min_quantity', 'special_price'))
-        # ถ้าร้านยังไม่ได้ตั้ง SKU ให้ใช้สินค้าหลักเป็น 1 SKU อัตโนมัติ
+        # ถ้าร้านยังไม่ได้ตั้ง SKU ให้ใช้สินค้าหลักเป็น 1 SKU อัตโนมัติ (กันระบบพัง)
         if not skus:
             skus = [{'id': f'p_{p.id}', 'name': 'ปกติ', 'price': p.price}]
             
@@ -169,7 +170,6 @@ def product_add(request):
     if form.is_valid():
         product = form.save()
         
-        # รับค่า SKU และ Promotion แบบ JSON 
         try:
             skus = json.loads(request.POST.get('skus', '[]'))
             promos = json.loads(request.POST.get('promos', '[]'))
@@ -178,8 +178,9 @@ def product_add(request):
                 ProductSKU.objects.create(product=product, name=sku['name'], price=sku['price'])
             for promo in promos:
                 Promotion.objects.create(product=product, min_quantity=promo['min_quantity'], special_price=promo['special_price'])
-        except Exception:
-            pass # กันเหนียวเผื่อข้อมูลพัง
+        except Exception as e:
+            print("Error saving SKUs/Promos:", e)
+            pass
             
         return JsonResponse({'success': True})
     return JsonResponse({'success': False, 'errors': form.errors})
@@ -193,11 +194,11 @@ def product_edit(request, pk):
         if form.is_valid():
             product = form.save()
             
-            # ลบ SKU และ Promotion เดิมทิ้งก่อนสร้างใหม่
-            product.skus.all().delete()
-            product.promotions.all().delete()
-            
             try:
+                # ลบ SKU และ Promotion เดิมทิ้งก่อนสร้างใหม่
+                product.skus.all().delete()
+                product.promotions.all().delete()
+                
                 skus = json.loads(request.POST.get('skus', '[]'))
                 promos = json.loads(request.POST.get('promos', '[]'))
                 
@@ -205,13 +206,14 @@ def product_edit(request, pk):
                     ProductSKU.objects.create(product=product, name=sku['name'], price=sku['price'])
                 for promo in promos:
                     Promotion.objects.create(product=product, min_quantity=promo['min_quantity'], special_price=promo['special_price'])
-            except Exception:
+            except Exception as e:
+                # ปริ้นท์ Error เผื่อไว้ดูในหน้า Logs ของ Render
+                print("Error Edit SKU/Promo:", e)
                 pass
 
             return JsonResponse({'success': True})
         return JsonResponse({'success': False, 'errors': form.errors})
     
-    # ถ้าเป็น GET (เปิดดูข้อมูล) ให้ส่งข้อมูล SKU/Promo กลับไปด้วย
     return JsonResponse({
         'id':          product.id,
         'name':        product.name,
@@ -227,14 +229,11 @@ def product_edit(request, pk):
 @require_POST
 def product_delete(request, pk):
     product = get_object_or_404(Product, pk=pk)
-    
-    # ดัก Error ไว้เผื่อสินค้านั้นไม่มีรูป หรือ Cloudinary ลบไม่ผ่าน
     try:
         if product.image:
             product.image.delete(save=False)
     except Exception:
         pass
-        
     product.delete()
     return JsonResponse({'success': True})
 
