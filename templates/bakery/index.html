@@ -9,114 +9,141 @@
     </div>
 
     {% if products %}
-    <!-- รายการสินค้า -->
     <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-6">
         {% for product in products %}
-        <div class="bg-white rounded-2xl shadow-sm overflow-hidden hover:shadow-md transition flex flex-col">
+        <div class="bg-white rounded-2xl shadow-sm overflow-hidden hover:shadow-md transition flex flex-col cursor-pointer" onclick="openModal({{ product.id }})">
             {% if product.image %}
             <img src="{{ product.image.url }}" alt="{{ product.name }}" class="w-full h-40 object-cover">
             {% else %}
             <div class="w-full h-40 bg-amber-100 flex items-center justify-center text-4xl">🧁</div>
             {% endif %}
-            <div class="p-3 flex flex-col flex-1">
-                <h3 class="font-semibold text-gray-800 text-sm">{{ product.name }}</h3>
-                {% if product.description %}
-                <p class="text-gray-500 text-xs mt-1 line-clamp-2 flex-1">{{ product.description }}</p>
-                {% endif %}
-                <p class="text-amber-700 font-bold mt-2 mb-3">฿{{ product.price }}</p>
-                <!-- ปุ่มเพิ่ม/ลด จำนวน -->
-                <div class="flex items-center justify-between">
-                    <div class="flex items-center gap-2">
-                        <button onclick="changeQty({{ product.id }}, -1)"
-                                class="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 font-bold text-lg flex items-center justify-center transition">−</button>
-                        <span id="qty-{{ product.id }}" class="w-6 text-center font-bold text-gray-800 text-sm">0</span>
-                        <button onclick="changeQty({{ product.id }}, 1)"
-                                class="w-8 h-8 rounded-full bg-amber-500 hover:bg-amber-600 text-white font-bold text-lg flex items-center justify-center transition">+</button>
-                    </div>
-                    <span id="subtotal-{{ product.id }}" class="text-xs text-amber-600 font-semibold hidden"></span>
-                </div>
+            <div class="p-3 flex flex-col flex-1 text-center">
+                <h3 class="font-semibold text-gray-800 text-sm mb-1">{{ product.name }}</h3>
+                <p class="text-amber-700 font-bold text-sm mb-3">เริ่มต้น ฿{{ product.price }}</p>
+                <button class="mt-auto bg-amber-100 text-amber-800 hover:bg-amber-200 transition py-2 rounded-xl text-xs font-bold w-full">
+                    เลือกรสชาติ / จำนวน
+                </button>
             </div>
         </div>
         {% endfor %}
     </div>
 
-    <!-- ตะกร้าสินค้า (แสดงเมื่อมีสินค้า) -->
     <div id="cart-bar" class="hidden sticky bottom-4 z-30">
         <div class="bg-amber-700 text-white rounded-2xl shadow-xl px-5 py-4 flex items-center justify-between gap-4">
             <div>
                 <p class="text-sm opacity-80">ตะกร้าของคุณ (<span id="cart-count">0</span> รายการ)</p>
                 <p class="font-bold text-xl">฿<span id="cart-total">0</span></p>
             </div>
-            <a href="{% url 'order_page' %}" id="cart-link"
-               class="bg-white text-amber-700 font-bold px-6 py-2.5 rounded-xl text-sm hover:bg-amber-50 transition whitespace-nowrap">
+            <a href="{% url 'order_page' %}" class="bg-white text-amber-700 font-bold px-6 py-2.5 rounded-xl text-sm hover:bg-amber-50 transition whitespace-nowrap">
                 🛒 สั่งซื้อเลย
             </a>
         </div>
     </div>
-
     {% else %}
     <div class="text-center py-20 text-gray-400">
-        <p class="text-5xl mb-4">🧁</p>
-        <p>ยังไม่มีสินค้าในขณะนี้</p>
+        <p class="text-5xl mb-4">🧁</p><p>ยังไม่มีสินค้าในขณะนี้</p>
     </div>
     {% endif %}
+</div>
 
-    <div class="text-center mt-10 flex justify-center gap-6">
-        <a href="{% url 'track_order' %}" class="text-sm text-amber-600 hover:underline">📦 ติดตามออเดอร์</a>
-        <a href="{% url 'login' %}" class="text-xs text-gray-300 hover:text-gray-400">จัดการร้าน</a>
+<div id="sku-modal" class="hidden fixed inset-0 bg-black bg-opacity-60 z-50 flex items-end md:items-center justify-center">
+    <div class="bg-white rounded-t-3xl md:rounded-3xl p-6 w-full max-w-md shadow-2xl relative max-h-[90vh] flex flex-col transition-all">
+        <button onclick="closeModal()" class="absolute top-4 right-4 w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center font-bold text-gray-500 hover:bg-gray-200">✕</button>
+        <h3 id="modal-product-name" class="font-bold text-2xl mb-1 text-amber-800 pr-8"></h3>
+        <p id="modal-promos" class="text-sm text-green-600 mb-4 font-semibold bg-green-50 p-2.5 rounded-xl hidden"></p>
+        <div id="modal-skus-container" class="space-y-4 overflow-y-auto pr-2 pb-4"></div>
+        <button onclick="closeModal()" class="mt-4 w-full bg-amber-600 hover:bg-amber-700 transition text-white py-3.5 rounded-xl font-bold text-lg shadow-md">บันทึกใส่ตะกร้า</button>
     </div>
 </div>
 
 <script>
-// ข้อมูลสินค้าทั้งหมด
-const products = {
-    {% for product in products %}
-    {{ product.id }}: { name: "{{ product.name }}", price: {{ product.price }} },
-    {% endfor %}
-};
-
-// โหลด cart จาก sessionStorage (เพื่อให้ข้ามหน้าได้)
-let cart = {};
+const productsData = {{ products_json|safe }};
+let cart = {}; 
 try { cart = JSON.parse(sessionStorage.getItem('patthara_cart') || '{}'); } catch(e) {}
 
-// render ตั้งต้นจาก cart ที่บันทึกไว้
-Object.entries(cart).forEach(([id, qty]) => {
-    const qtyEl = document.getElementById('qty-' + id);
-    if (qtyEl) qtyEl.textContent = qty;
-});
-updateCartBar();
+function calculateCart() {
+    let productCounts = {};
+    Object.values(cart).forEach(item => {
+        if (item.qty > 0) {
+            productCounts[item.productId] = (productCounts[item.productId] || 0) + item.qty;
+        }
+    });
 
-function changeQty(id, delta) {
-    cart[id] = (cart[id] || 0) + delta;
-    if (cart[id] < 0) cart[id] = 0;
-    document.getElementById('qty-' + id).textContent = cart[id];
-
-    // อัปเดต subtotal label
-    const subEl = document.getElementById('subtotal-' + id);
-    if (cart[id] > 0) {
-        subEl.textContent = '฿' + (products[id].price * cart[id]).toLocaleString();
-        subEl.classList.remove('hidden');
-    } else {
-        subEl.classList.add('hidden');
-    }
-
-    sessionStorage.setItem('patthara_cart', JSON.stringify(cart));
-    updateCartBar();
+    let total = 0, cartCount = 0;
+    Object.entries(cart).forEach(([skuId, item]) => {
+        if (item.qty <= 0) return;
+        let currentPrice = item.price;
+        const pData = productsData[item.productId];
+        
+        if (pData && pData.promos && pData.promos.length > 0) {
+            const totalQty = productCounts[item.productId];
+            for (let promo of pData.promos) {
+                if (totalQty >= promo.min_quantity) {
+                    currentPrice = promo.special_price; break;
+                }
+            }
+        }
+        total += currentPrice * item.qty;
+        cartCount += item.qty;
+    });
+    return { total, cartCount };
 }
 
 function updateCartBar() {
-    const items = Object.entries(cart).filter(([, qty]) => qty > 0);
+    const { total, cartCount } = calculateCart();
     const bar = document.getElementById('cart-bar');
-    if (items.length === 0) { bar.classList.add('hidden'); return; }
+    if (cartCount === 0) { bar.classList.add('hidden'); return; }
     bar.classList.remove('hidden');
-
-    let total = 0, count = 0;
-    items.forEach(([id, qty]) => {
-        total += (products[id]?.price || 0) * qty;
-        count += qty;
-    });
     document.getElementById('cart-total').textContent = total.toLocaleString();
-    document.getElementById('cart-count').textContent = count;
+    document.getElementById('cart-count').textContent = cartCount;
 }
+
+function openModal(productId) {
+    const pData = productsData[productId];
+    if (!pData) return;
+
+    document.getElementById('modal-product-name').textContent = pData.name;
+    const promoEl = document.getElementById('modal-promos');
+    if (pData.promos.length > 0) {
+        promoEl.innerHTML = '✨ โปรโมชั่น:<br>' + pData.promos.map(pr => `- ซื้อครบ ${pr.min_quantity} ชิ้น เหลือชิ้นละ ฿${pr.special_price}`).join('<br>');
+        promoEl.classList.remove('hidden');
+    } else {
+        promoEl.classList.add('hidden');
+    }
+
+    const skusContainer = document.getElementById('modal-skus-container');
+    skusContainer.innerHTML = pData.skus.map(sku => {
+        const currentQty = cart[sku.id] ? cart[sku.id].qty : 0;
+        return `
+        <div class="flex items-center justify-between border-b pb-3 border-gray-100 last:border-0 last:pb-0">
+            <div>
+                <p class="font-semibold text-gray-800">${sku.name}</p>
+                <p class="text-amber-700 text-sm font-bold">฿${sku.price}</p>
+            </div>
+            <div class="flex items-center gap-3">
+                <button onclick="changeQty('${sku.id}', ${productId}, '${sku.name}', ${sku.price}, -1)" class="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 font-bold text-lg flex items-center justify-center">-</button>
+                <span id="modal-qty-${sku.id}" class="w-6 text-center font-bold">${currentQty}</span>
+                <button onclick="changeQty('${sku.id}', ${productId}, '${sku.name}', ${sku.price}, 1)" class="w-8 h-8 rounded-full bg-amber-500 hover:bg-amber-600 text-white font-bold text-lg flex items-center justify-center">+</button>
+            </div>
+        </div>`;
+    }).join('');
+
+    document.getElementById('sku-modal').classList.remove('hidden');
+}
+
+function closeModal() { document.getElementById('sku-modal').classList.add('hidden'); }
+
+function changeQty(skuId, productId, skuName, price, delta) {
+    if (!cart[skuId]) { cart[skuId] = { productId, skuName, price, qty: 0 }; }
+    cart[skuId].qty += delta;
+    if (cart[skuId].qty <= 0) { delete cart[skuId]; }
+    
+    sessionStorage.setItem('patthara_cart', JSON.stringify(cart));
+    const qtyEl = document.getElementById(`modal-qty-${skuId}`);
+    if (qtyEl) qtyEl.textContent = cart[skuId] ? cart[skuId].qty : 0;
+    updateCartBar();
+}
+
+updateCartBar();
 </script>
 {% endblock %}
