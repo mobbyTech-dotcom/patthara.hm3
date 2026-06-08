@@ -8,37 +8,11 @@
         <a href="{% url 'index' %}" class="text-sm text-amber-600 hover:underline">← กลับหน้าร้าน</a>
     </div>
 
-    <div id="selected-products-container" class="bg-white rounded-2xl shadow-sm p-5 mb-6 hidden">
+    <div id="cart-container" class="bg-white rounded-2xl shadow-sm p-5 mb-6 hidden">
         <h2 class="font-bold text-gray-700 mb-4 text-lg">รายการสินค้าที่เลือก</h2>
-        <div class="space-y-3">
-            {% for product in products %}
-            <div id="product-row-{{ product.id }}" class="flex items-center gap-3 border rounded-xl p-3 hidden">
-                {% if product.image %}
-                <img src="{{ product.image.url }}" class="w-14 h-14 object-cover rounded-lg flex-shrink-0">
-                {% else %}
-                <div class="w-14 h-14 bg-amber-100 rounded-lg flex items-center justify-center text-2xl flex-shrink-0">🧁</div>
-                {% endif %}
-                <div class="flex-1">
-                    <p class="font-semibold text-gray-800 text-sm">{{ product.name }}</p>
-                    <p class="text-amber-700 font-bold text-sm">฿{{ product.price }}</p>
-                </div>
-                <div class="flex items-center gap-2">
-                    <button onclick="changeQty({{ product.id }}, -1)"
-                            class="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 font-bold text-lg flex items-center justify-center">−</button>
-                    <span id="qty-{{ product.id }}" class="w-6 text-center font-bold text-gray-800">0</span>
-                    <button onclick="changeQty({{ product.id }}, 1)"
-                            class="w-8 h-8 rounded-full bg-amber-500 hover:bg-amber-600 text-white font-bold text-lg flex items-center justify-center">+</button>
-                </div>
-            </div>
-            {% endfor %}
-        </div>
-    </div>
-
-    <div id="cart-section" class="hidden bg-amber-50 rounded-2xl p-5 mb-6 border border-amber-200">
-        <h2 class="font-bold text-gray-700 mb-3 text-lg">🧺 สรุปรายการที่เลือก</h2>
-        <div id="cart-items" class="space-y-2 mb-3"></div>
-        <div class="border-t pt-3 flex justify-between font-bold text-amber-800 text-lg">
-            <span>ยอดรวม</span>
+        <div id="dynamic-cart-items" class="space-y-4"></div>
+        <div class="border-t mt-4 pt-4 flex justify-between font-bold text-amber-800 text-xl">
+            <span>ยอดรวมทั้งสิ้น</span>
             <span id="cart-total">฿0</span>
         </div>
     </div>
@@ -46,108 +20,120 @@
     <div class="bg-white rounded-2xl shadow-sm p-5 mb-6">
         <h2 class="font-bold text-gray-700 mb-4 text-lg">📋 ข้อมูลการสั่งซื้อ</h2>
         <div class="space-y-3">
-            <input type="text" id="customer_name" placeholder="ชื่อ-นามสกุล *"
-                   class="w-full border rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-amber-400 focus:outline-none">
-            <input type="tel" id="phone" placeholder="เบอร์โทรศัพท์ *"
-                   class="w-full border rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-amber-400 focus:outline-none">
-            <textarea id="address" placeholder="ที่อยู่ *" rows="3"
-                      class="w-full border rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-amber-400 focus:outline-none"></textarea>
+            <input type="text" id="customer_name" placeholder="ชื่อ-นามสกุล *" class="w-full border rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-amber-400 focus:outline-none">
+            <input type="tel" id="phone" placeholder="เบอร์โทรศัพท์ *" class="w-full border rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-amber-400 focus:outline-none">
+            <textarea id="address" placeholder="ที่อยู่ *" rows="3" class="w-full border rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-amber-400 focus:outline-none"></textarea>
             <div>
                 <label class="block text-xs text-gray-500 mb-1">วันนัดรับ *</label>
-                <input type="date" id="appointment_date"
-                       class="w-full border rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-amber-400 focus:outline-none">
+                <input type="date" id="appointment_date" class="w-full border rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-amber-400 focus:outline-none">
             </div>
-            <textarea id="note" placeholder="หมายเหตุเพิ่มเติม (ไม่บังคับ)" rows="2"
-                      class="w-full border rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-amber-400 focus:outline-none"></textarea>
+            <textarea id="note" placeholder="หมายเหตุเพิ่มเติม (ไม่บังคับ)" rows="2" class="w-full border rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-amber-400 focus:outline-none"></textarea>
         </div>
     </div>
 
-    <button onclick="submitOrder()"
-            class="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold py-4 rounded-2xl text-lg transition shadow-md">
+    <button onclick="submitOrder()" class="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold py-4 rounded-2xl text-lg transition shadow-md">
         📄 ยืนยันและดูใบออเดอร์
     </button>
 </div>
 
 <script>
-const products = {
-    {% for product in products %}
-    {{ product.id }}: { name: "{{ product.name }}", price: {{ product.price }} },
-    {% endfor %}
-};
-
-// โหลด cart จาก sessionStorage
+const productsData = {{ products_json|safe }};
 let cart = {};
 try { cart = JSON.parse(sessionStorage.getItem('patthara_cart') || '{}'); } catch(e) {}
 
-// ตรวจสอบว่ามีสินค้าในตะกร้าหรือไม่ ถ้ามีให้เปิดกล่องใหญ่
-const hasItems = Object.values(cart).some(qty => qty > 0);
-if (hasItems) {
-    document.getElementById('selected-products-container').classList.remove('hidden');
-}
-
-// render ค่าเริ่มต้น (โชว์เฉพาะชิ้นที่มีในตะกร้า)
-Object.entries(cart).forEach(([id, qty]) => {
-    if (qty > 0) {
-        const row = document.getElementById('product-row-' + id);
-        if (row) row.classList.remove('hidden'); // แสดงสินค้านี้
-        
-        const el = document.getElementById('qty-' + id);
-        if (el) el.textContent = qty;
-    }
-});
-updateCart();
-
-function changeQty(id, delta) {
-    cart[id] = (cart[id] || 0) + delta;
-    
-    if (cart[id] <= 0) {
-        cart[id] = 0;
-        // ถ้าลดจนเหลือ 0 ให้ซ่อนสินค้านั้นจากหน้านี้ไปเลย
-        const row = document.getElementById('product-row-' + id);
-        if (row) row.classList.add('hidden');
-    }
-    
-    document.getElementById('qty-' + id).textContent = cart[id];
-    sessionStorage.setItem('patthara_cart', JSON.stringify(cart));
-    updateCart();
-    
-    // ถ้าสินค้าถูกลบจนหมดตะกร้า ให้ซ่อนกล่องใหญ่ด้วย
-    if (!Object.values(cart).some(qty => qty > 0)) {
-        document.getElementById('selected-products-container').classList.add('hidden');
-    }
-}
-
-function updateCart() {
-    const items = Object.entries(cart).filter(([id, qty]) => qty > 0);
-    const section = document.getElementById('cart-section');
-    const cartItems = document.getElementById('cart-items');
-    const cartTotal = document.getElementById('cart-total');
-
-    if (items.length === 0) { section.classList.add('hidden'); return; }
-    section.classList.remove('hidden');
+function calculateCart() {
+    let productCounts = {};
+    Object.values(cart).forEach(item => {
+        if (item.qty > 0) {
+            productCounts[item.productId] = (productCounts[item.productId] || 0) + item.qty;
+        }
+    });
 
     let total = 0;
-    cartItems.innerHTML = items.map(([id, qty]) => {
-        const p = products[id];
-        if (!p) return '';
-        const sub = p.price * qty;
-        total += sub;
-        return `<div class="flex justify-between text-sm py-1">
-            <span class="text-gray-700">${p.name} × ${qty}</span>
-            <span class="font-semibold text-gray-800">฿${sub.toLocaleString()}</span>
+    let finalItems = [];
+
+    Object.entries(cart).forEach(([skuId, item]) => {
+        if (item.qty <= 0) return;
+        
+        let currentPrice = item.price;
+        const pData = productsData[item.productId];
+        let hasDiscount = false;
+
+        if (pData && pData.promos && pData.promos.length > 0) {
+            const totalQty = productCounts[item.productId];
+            for (let promo of pData.promos) {
+                if (totalQty >= promo.min_quantity) {
+                    currentPrice = promo.special_price;
+                    hasDiscount = true; break;
+                }
+            }
+        }
+        
+        total += currentPrice * item.qty;
+        finalItems.push({
+            skuId: skuId,
+            productId: item.productId,
+            name: `${pData.name} (${item.skuName})`,
+            price: currentPrice,
+            qty: item.qty,
+            originalPrice: item.price,
+            hasDiscount: hasDiscount
+        });
+    });
+
+    return { total, finalItems };
+}
+
+function renderCart() {
+    const { total, finalItems } = calculateCart();
+    const container = document.getElementById('cart-container');
+    const itemsDiv = document.getElementById('dynamic-cart-items');
+    
+    if (finalItems.length === 0) {
+        container.classList.add('hidden');
+        return;
+    }
+    
+    container.classList.remove('hidden');
+    document.getElementById('cart-total').textContent = '฿' + total.toLocaleString();
+
+    itemsDiv.innerHTML = finalItems.map(item => {
+        const pData = productsData[item.productId];
+        const imgHtml = pData && pData.image ? `<img src="${pData.image}" class="w-14 h-14 object-cover rounded-lg flex-shrink-0">` : `<div class="w-14 h-14 bg-amber-100 rounded-lg flex items-center justify-center text-2xl flex-shrink-0">🧁</div>`;
+        const priceHtml = item.hasDiscount 
+            ? `<span class="line-through text-gray-400 text-xs mr-1">฿${item.originalPrice}</span><span class="text-green-600 font-bold">฿${item.price}</span> <span class="text-xs text-green-600 bg-green-100 px-1.5 py-0.5 rounded ml-1">ราคาโปร!</span>`
+            : `<span class="text-amber-700 font-bold">฿${item.price}</span>`;
+
+        return `
+        <div class="flex items-center gap-3 border rounded-xl p-3">
+            ${imgHtml}
+            <div class="flex-1">
+                <p class="font-semibold text-gray-800 text-sm">${item.name}</p>
+                <div class="text-sm mt-1">${priceHtml}</div>
+            </div>
+            <div class="flex items-center gap-2">
+                <button onclick="changeQty('${item.skuId}', -1)" class="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 font-bold text-lg flex items-center justify-center">−</button>
+                <span class="w-6 text-center font-bold text-gray-800">${item.qty}</span>
+                <button onclick="changeQty('${item.skuId}', 1)" class="w-8 h-8 rounded-full bg-amber-500 hover:bg-amber-600 text-white font-bold text-lg flex items-center justify-center">+</button>
+            </div>
         </div>`;
     }).join('');
-    cartTotal.textContent = '฿' + total.toLocaleString();
+}
+
+function changeQty(skuId, delta) {
+    if (cart[skuId]) {
+        cart[skuId].qty += delta;
+        if (cart[skuId].qty <= 0) delete cart[skuId];
+        sessionStorage.setItem('patthara_cart', JSON.stringify(cart));
+        renderCart();
+    }
 }
 
 async function submitOrder() {
-    const items = Object.entries(cart).filter(([id, qty]) => qty > 0).map(([id, qty]) => ({
-        name: products[id].name,
-        price: products[id].price,
-        quantity: qty,
-    }));
-    
-    if (items.length === 0) return alert('กรุณาเลือกสินค้าก่อนยืนยันออเดอร์');
+    const { total, finalItems } = calculateCart();
+    if (finalItems.length === 0) return alert('กรุณาเลือกสินค้าก่อนยืนยันออเดอร์');
+
+    const items = finalItems.map(i => ({ name: i.name, price: i.price, quantity: i.qty }));
 
     const name = document.getElementById('customer_name').value.trim();
     const phone = document.getElementById('phone').value.trim();
@@ -156,8 +142,6 @@ async function submitOrder() {
     const note = document.getElementById('note').value.trim();
 
     if (!name || !phone || !address || !date) return alert('กรุณากรอกข้อมูลให้ครบ (ชื่อ, เบอร์โทร, ที่อยู่, วันนัดรับ)');
-
-    const total = items.reduce((s, i) => s + i.price * i.quantity, 0);
 
     const res = await fetch('/order/create/', {
         method: 'POST',
@@ -172,5 +156,7 @@ async function submitOrder() {
         alert('เกิดข้อผิดพลาด กรุณาลองใหม่');
     }
 }
+
+renderCart();
 </script>
 {% endblock %}
