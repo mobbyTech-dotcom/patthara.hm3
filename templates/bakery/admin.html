@@ -3,7 +3,6 @@
 
 {% block content %}
 <div class="max-w-5xl mx-auto px-4 py-8">
-    <!-- Header -->
     <div class="flex items-center justify-between mb-8">
         <h1 class="text-2xl font-bold text-amber-800">🧁 จัดการร้าน</h1>
         <div class="flex gap-3">
@@ -12,7 +11,6 @@
         </div>
     </div>
 
-    <!-- Tabs -->
     <div class="flex gap-1 mb-6 bg-gray-100 rounded-xl p-1">
         <button onclick="switchTab('products')" id="tab-products"
                 class="flex-1 py-2 px-4 rounded-lg text-sm font-semibold transition tab-btn active-tab">
@@ -28,7 +26,6 @@
         </button>
     </div>
 
-    <!-- ─── แท็บ: สินค้า ─── -->
     <div id="panel-products">
         <button onclick="openModal()"
                 class="mb-6 bg-amber-600 hover:bg-amber-700 text-white px-5 py-2.5 rounded-xl font-semibold text-sm transition">
@@ -82,9 +79,7 @@
         </div>
     </div>
 
-    <!-- ─── แท็บ: ออเดอร์ ─── -->
     <div id="panel-orders" class="hidden">
-        <!-- Filter -->
         <div class="flex gap-2 mb-4 flex-wrap items-center">
             <button onclick="filterOrders('all')" id="filter-all"
                     class="filter-btn active-filter px-4 py-1.5 rounded-full text-sm font-semibold transition">
@@ -102,7 +97,6 @@
                     class="filter-btn px-4 py-1.5 rounded-full text-sm font-semibold transition bg-gray-100 text-gray-600">
                 🎉 เสร็จสิ้น
             </button>
-            <!-- ปุ่มสรุปยอดขาย -->
             <button onclick="openSalesSummary()"
                     class="ml-auto px-4 py-1.5 rounded-full text-sm font-semibold transition bg-amber-600 text-white hover:bg-amber-700 flex items-center gap-1.5">
                 📊 สรุปยอดขาย
@@ -112,7 +106,6 @@
         <div class="space-y-4" id="order-list">
             {% for order in orders %}
             <div class="bg-white rounded-2xl shadow-sm overflow-hidden order-card" data-status="{{ order.status }}" id="order-card-{{ order.id }}">
-                <!-- Order Header -->
                 <div class="flex items-center justify-between px-5 py-3 bg-gray-50 border-b">
                     <div class="flex items-center gap-3">
                         <span class="font-bold text-gray-700">#{{ order.id }}</span>
@@ -120,7 +113,6 @@
                         <span class="text-xs text-gray-400">{{ order.created_at|date:"d/m/Y H:i" }}</span>
                     </div>
                     <div class="flex items-center gap-2">
-                        <!-- Dropdown เปลี่ยนสถานะ -->
                         <select onchange="updateOrderStatus({{ order.id }}, this.value)"
                                 id="status-select-{{ order.id }}"
                                 class="text-xs border rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-400
@@ -134,9 +126,7 @@
                     </div>
                 </div>
 
-                <!-- Order Body -->
                 <div class="px-5 py-3 flex flex-wrap gap-4 items-start">
-                    <!-- รายการสินค้า -->
                     <div class="flex-1 min-w-48">
                         {% for item in order.items.all %}
                         <p class="text-sm text-gray-700">{{ item.product_name }} <span class="text-gray-400">×{{ item.quantity }}</span> <span class="text-gray-500 ml-1">฿{{ item.subtotal }}</span></p>
@@ -144,40 +134,32 @@
                         <p class="font-bold text-amber-700 mt-1 text-sm">ยอดรวม ฿{{ order.total }}</p>
                     </div>
 
-                    <!-- ข้อมูลลูกค้า -->
                     <div class="text-xs text-gray-500 space-y-0.5 min-w-40">
                         <p>📞 {{ order.phone }}</p>
                         <p>📅 นัด {{ order.appointment_date|date:"d/m/Y" }}</p>
                         {% if order.note %}<p>📝 {{ order.note }}</p>{% endif %}
                     </div>
 
-                    <!-- สลิป -->
                     <div class="text-center">
                         {% if order.slip_image %}
                         <a href="{{ order.slip_image.url }}" target="_blank">
-                            <img src="{{ order.slip_image.url }}"
-                                 class="w-16 h-16 object-cover rounded-lg border hover:opacity-90 transition"
-                                 title="ดูสลิปขนาดเต็ม">
+                            <img src="{{ order.slip_image.url }}" class="w-16 h-16 object-cover rounded-lg border hover:opacity-90 transition">
                         </a>
                         <p class="text-xs text-green-600 mt-1">มีสลิป</p>
                         {% else %}
-                        <div class="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center text-gray-400 text-xs text-center">
-                            ยังไม่มีสลิป
-                        </div>
+                        <div class="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center text-gray-400 text-xs text-center">ยังไม่มีสลิป</div>
                         {% endif %}
                     </div>
                 </div>
             </div>
             {% empty %}
             <div class="text-center py-20 text-gray-400">
-                <p class="text-4xl mb-3">📦</p>
-                <p>ยังไม่มีออเดอร์</p>
+                <p class="text-4xl mb-3">📦</p><p>ยังไม่มีออเดอร์</p>
             </div>
             {% endfor %}
         </div>
     </div>
 
-    <!-- ─── แท็บ: การชำระเงิน ─── -->
     <div id="panel-payment" class="hidden">
         <div class="bg-white rounded-2xl shadow-sm p-6 max-w-lg">
             <h2 class="font-bold text-gray-700 mb-1">💳 ข้อมูลการชำระเงิน</h2>
@@ -186,39 +168,28 @@
             <div id="qr-preview-wrap" class="mb-4 {% if not payment.qr_image %}hidden{% endif %}">
                 <p class="text-xs text-gray-500 mb-1">QR ปัจจุบัน</p>
                 <div class="relative inline-block">
-                    <img id="qr-preview-img"
-                         src="{% if payment.qr_image %}{{ payment.qr_image.url }}{% endif %}"
-                         class="w-36 h-36 object-contain border rounded-xl p-2">
-                    <button onclick="deleteQR()"
-                            class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 text-xs flex items-center justify-center hover:bg-red-600">✕</button>
+                    <img id="qr-preview-img" src="{% if payment.qr_image %}{{ payment.qr_image.url }}{% endif %}" class="w-36 h-36 object-contain border rounded-xl p-2">
+                    <button onclick="deleteQR()" class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 text-xs flex items-center justify-center hover:bg-red-600">✕</button>
                 </div>
             </div>
 
             <div class="space-y-3">
                 <div>
                     <label class="block text-xs text-gray-500 mb-1">ชื่อธนาคาร</label>
-                    <input type="text" id="pay-bank" value="{{ payment.bank_name }}"
-                           placeholder="เช่น ธนาคารกสิกรไทย"
-                           class="w-full border rounded-xl px-3.5 py-2 text-sm focus:ring-2 focus:ring-amber-400 focus:outline-none">
+                    <input type="text" id="pay-bank" value="{{ payment.bank_name }}" class="w-full border rounded-xl px-3.5 py-2 text-sm focus:ring-2 focus:ring-amber-400 focus:outline-none">
                 </div>
                 <div>
                     <label class="block text-xs text-gray-500 mb-1">เลขที่บัญชี</label>
-                    <input type="text" id="pay-account" value="{{ payment.account_number }}"
-                           placeholder="xxx-x-xxxxx-x"
-                           class="w-full border rounded-xl px-3.5 py-2 text-sm focus:ring-2 focus:ring-amber-400 focus:outline-none">
+                    <input type="text" id="pay-account" value="{{ payment.account_number }}" class="w-full border rounded-xl px-3.5 py-2 text-sm focus:ring-2 focus:ring-amber-400 focus:outline-none">
                 </div>
                 <div>
                     <label class="block text-xs text-gray-500 mb-1">ชื่อบัญชี</label>
-                    <input type="text" id="pay-name" value="{{ payment.account_name }}"
-                           placeholder="ชื่อ-นามสกุลเจ้าของบัญชี"
-                           class="w-full border rounded-xl px-3.5 py-2 text-sm focus:ring-2 focus:ring-amber-400 focus:outline-none">
+                    <input type="text" id="pay-name" value="{{ payment.account_name }}" class="w-full border rounded-xl px-3.5 py-2 text-sm focus:ring-2 focus:ring-amber-400 focus:outline-none">
                 </div>
                 <div>
                     <label class="block text-xs text-gray-500 mb-1">QR Code (อัปโหลดใหม่)</label>
                     <label class="block cursor-pointer">
-                        <div class="border-2 border-dashed border-amber-300 rounded-xl py-3 text-center text-sm text-amber-500 hover:bg-amber-50 transition">
-                            📷 เลือกรูป QR Code
-                        </div>
+                        <div class="border-2 border-dashed border-amber-300 rounded-xl py-3 text-center text-sm text-amber-500 hover:bg-amber-50 transition">📷 เลือกรูป QR Code</div>
                         <input type="file" id="pay-qr-file" accept="image/*" class="hidden" onchange="previewNewQR(event)">
                     </label>
                     <div id="new-qr-preview" class="hidden mt-2">
@@ -227,30 +198,21 @@
                     </div>
                 </div>
             </div>
-
-            <button onclick="savePayment()"
-                    class="mt-5 w-full bg-amber-600 hover:bg-amber-700 text-white font-bold py-2.5 rounded-xl text-sm transition">
-                💾 บันทึกข้อมูลการชำระเงิน
-            </button>
+            <button onclick="savePayment()" class="mt-5 w-full bg-amber-600 hover:bg-amber-700 text-white font-bold py-2.5 rounded-xl text-sm transition">💾 บันทึกข้อมูลการชำระเงิน</button>
             <p id="pay-msg" class="hidden mt-3 text-center text-sm text-green-600 font-semibold">✅ บันทึกสำเร็จแล้ว!</p>
         </div>
     </div>
 </div>
 
-<!-- ─── Modal สรุปยอดขาย ─── -->
 <div id="sales-modal" class="hidden fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4">
     <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
-        <!-- Header -->
         <div class="flex items-center justify-between mb-5">
             <div>
                 <h2 class="text-lg font-bold text-gray-800">📊 สรุปยอดขาย</h2>
                 <p class="text-xs text-gray-400 mt-0.5">เฉพาะออเดอร์ที่ <span class="text-green-600 font-semibold">เสร็จสิ้น</span> แล้ว</p>
             </div>
-            <button onclick="closeSalesSummary()"
-                    class="text-gray-400 hover:text-gray-600 text-xl font-bold leading-none">✕</button>
+            <button onclick="closeSalesSummary()" class="text-gray-400 hover:text-gray-600 text-xl font-bold leading-none">✕</button>
         </div>
-
-        <!-- ยอดรวม -->
         <div class="grid grid-cols-2 gap-3 mb-5">
             <div class="bg-amber-50 border border-amber-100 rounded-xl p-4 text-center">
                 <p class="text-2xl font-extrabold text-amber-700">฿{{ sales_total|floatformat:"0" }}</p>
@@ -261,20 +223,14 @@
                 <p class="text-xs text-green-500 mt-1 font-semibold">ออเดอร์ที่เสร็จสิ้น</p>
             </div>
         </div>
-
-        <!-- สรุปสินค้า -->
         {% if product_summary %}
         <div>
-            <h3 class="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2">
-                🧁 สินค้าที่ขายได้
-                <span class="text-xs text-gray-400 font-normal">(รวมทุกออเดอร์ที่เสร็จสิ้น)</span>
-            </h3>
+            <h3 class="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2">🧁 สินค้าที่ขายได้ <span class="text-xs text-gray-400 font-normal">(รวมทุกออเดอร์)</span></h3>
             <div class="space-y-2">
                 {% for item in product_summary %}
                 <div class="flex items-center justify-between bg-gray-50 rounded-xl px-4 py-3">
                     <div class="flex items-center gap-2">
-                        <span class="text-base">🧁</span>
-                        <span class="text-sm font-medium text-gray-800">{{ item.product_name }}</span>
+                        <span class="text-base">🧁</span><span class="text-sm font-medium text-gray-800">{{ item.product_name }}</span>
                     </div>
                     <div class="flex items-center gap-3 text-right">
                         <span class="text-xs text-gray-400">{{ item.total_qty }} ชิ้น</span>
@@ -285,55 +241,60 @@
             </div>
         </div>
         {% else %}
-        <div class="text-center py-8 text-gray-400">
-            <p class="text-3xl mb-2">📭</p>
-            <p class="text-sm">ยังไม่มีออเดอร์ที่เสร็จสิ้น</p>
-        </div>
+        <div class="text-center py-8 text-gray-400"><p class="text-3xl mb-2">📭</p><p class="text-sm">ยังไม่มีออเดอร์ที่เสร็จสิ้น</p></div>
         {% endif %}
-
-        <button onclick="closeSalesSummary()"
-                class="mt-5 w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-2.5 rounded-xl text-sm transition">
-            ปิด
-        </button>
+        <button onclick="closeSalesSummary()" class="mt-5 w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-2.5 rounded-xl text-sm transition">ปิด</button>
     </div>
 </div>
 
-<!-- Modal เพิ่ม/แก้ไขสินค้า -->
 <div id="modal" class="hidden fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4">
-    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
-        <h2 id="modal-title" class="text-lg font-bold text-gray-800 mb-4">เพิ่มสินค้า</h2>
-        <div id="img-preview-wrap" class="mb-4 hidden">
-            <img id="img-preview" class="w-full h-40 object-cover rounded-xl">
-        </div>
-        <label class="block mb-4 cursor-pointer">
-            <div class="border-2 border-dashed border-amber-300 rounded-xl py-4 text-center text-sm text-amber-500 hover:bg-amber-50 transition">
-                📷 เลือกรูปภาพ
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 max-h-[95vh] flex flex-col">
+        <h2 id="modal-title" class="text-lg font-bold text-gray-800 mb-4 shrink-0">เพิ่มสินค้า</h2>
+        
+        <div class="overflow-y-auto flex-1 pr-2 space-y-3 pb-4">
+            
+            <div id="img-preview-wrap" class="hidden mb-2">
+                <img id="img-preview" class="w-full h-40 object-cover rounded-xl">
             </div>
-            <input type="file" accept="image/*" id="prod-img-file" class="hidden" onchange="previewImage(event)">
-        </label>
-        <input type="hidden" id="prod-id">
-        <div class="mb-3">
-            <input type="text" id="prod-name" placeholder="ชื่อสินค้า"
-                   class="w-full border rounded-xl px-3.5 py-2 text-sm focus:ring-2 focus:ring-amber-400 focus:outline-none">
-        </div>
-        <div class="mb-3">
-            <input type="number" id="prod-price" placeholder="ราคา (บาท)" min="0"
-                   class="w-full border rounded-xl px-3.5 py-2 text-sm focus:ring-2 focus:ring-amber-400 focus:outline-none">
-        </div>
-        <div class="mb-4">
-            <textarea id="prod-desc" placeholder="รายละเอียด (ไม่บังคับ)" rows="3"
-                      class="w-full border rounded-xl px-3.5 py-2 text-sm focus:ring-2 focus:ring-amber-400 focus:outline-none"></textarea>
-        </div>
-        <div class="flex gap-3">
-            <button onclick="saveProduct()"
-                    class="flex-1 bg-amber-600 hover:bg-amber-700 text-white font-semibold py-2.5 rounded-xl text-sm transition">บันทึก</button>
-            <button onclick="closeModal()"
-                    class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-2.5 rounded-xl text-sm transition">ยกเลิก</button>
+            <label class="block cursor-pointer">
+                <div class="border-2 border-dashed border-amber-300 rounded-xl py-3 text-center text-sm text-amber-500 hover:bg-amber-50 transition">
+                    📷 เลือกรูปภาพ
+                </div>
+                <input type="file" accept="image/*" id="prod-img-file" class="hidden" onchange="previewImage(event)">
+            </label>
+            <input type="hidden" id="prod-id">
+            
+            <input type="text" id="prod-name" placeholder="ชื่อสินค้า *" class="w-full border rounded-xl px-3.5 py-2 text-sm focus:ring-2 focus:ring-amber-400 focus:outline-none">
+            <input type="number" id="prod-price" placeholder="ราคาเริ่มต้น (บาท) *" min="0" class="w-full border rounded-xl px-3.5 py-2 text-sm focus:ring-2 focus:ring-amber-400 focus:outline-none">
+            <textarea id="prod-desc" placeholder="รายละเอียด (ไม่บังคับ)" rows="2" class="w-full border rounded-xl px-3.5 py-2 text-sm focus:ring-2 focus:ring-amber-400 focus:outline-none"></textarea>
+
+            <hr class="my-4 border-gray-100">
+
+            <div>
+                <div class="flex items-center justify-between mb-3">
+                    <label class="font-bold text-gray-700 text-sm">🍡 ตัวเลือกสินค้า (SKU)</label>
+                    <button type="button" onclick="addSkuRow()" class="text-xs bg-amber-100 text-amber-700 px-2 py-1.5 rounded hover:bg-amber-200 font-semibold">+ เพิ่มตัวเลือก</button>
+                </div>
+                <div id="skus-container" class="space-y-2"></div>
+            </div>
+
+            <hr class="my-4 border-gray-100">
+
+            <div>
+                <div class="flex items-center justify-between mb-3">
+                    <label class="font-bold text-gray-700 text-sm">✨ โปรโมชั่น</label>
+                    <button type="button" onclick="addPromoRow()" class="text-xs bg-green-100 text-green-700 px-2 py-1.5 rounded hover:bg-green-200 font-semibold">+ เพิ่มโปร</button>
+                </div>
+                <div id="promos-container" class="space-y-2"></div>
+            </div>
+            
+        </div> <div class="flex gap-3 pt-4 border-t mt-auto shrink-0">
+            <button onclick="saveProduct()" class="flex-1 bg-amber-600 hover:bg-amber-700 text-white font-semibold py-2.5 rounded-xl text-sm transition shadow-md">บันทึก</button>
+            <button onclick="closeModal()" class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-2.5 rounded-xl text-sm transition">ยกเลิก</button>
         </div>
     </div>
 </div>
 
-<!-- Slip Modal -->
 <div id="slip-modal" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center z-50 px-4" onclick="closeSlipModal()">
     <img id="slip-modal-img" class="max-w-full max-h-full rounded-xl shadow-2xl" onclick="event.stopPropagation()">
 </div>
@@ -348,33 +309,22 @@
 <script>
 const csrfToken = '{{ csrf_token }}';
 
-/* ─── Sales Summary Modal ─── */
-function openSalesSummary() {
-    document.getElementById('sales-modal').classList.remove('hidden');
-}
-function closeSalesSummary() {
-    document.getElementById('sales-modal').classList.add('hidden');
-}
-// ปิด modal เมื่อคลิก backdrop
-document.getElementById('sales-modal').addEventListener('click', function(e) {
-    if (e.target === this) closeSalesSummary();
-});
+/* ─── Sales Summary ─── */
+function openSalesSummary() { document.getElementById('sales-modal').classList.remove('hidden'); }
+function closeSalesSummary() { document.getElementById('sales-modal').classList.add('hidden'); }
 
-/* ─── Tabs ─── */
+/* ─── Tabs & Filters ─── */
 function switchTab(name) {
     ['products','orders','payment'].forEach(t => {
         document.getElementById('panel-' + t).classList.toggle('hidden', t !== name);
         document.getElementById('tab-' + t).classList.toggle('active-tab', t === name);
     });
 }
-
-/* ─── Order Filter ─── */
 function filterOrders(status) {
     document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active-filter'));
     document.getElementById('filter-' + status).classList.add('active-filter');
     document.querySelectorAll('.order-card').forEach(card => {
-        const show = status === 'all' || card.dataset.status === status;
-        card.classList.toggle('hidden', !show);
+        card.classList.toggle('hidden', !(status === 'all' || card.dataset.status === status));
     });
 }
 
@@ -382,17 +332,10 @@ function filterOrders(status) {
 async function updateOrderStatus(orderId, status) {
     const formData = new FormData();
     formData.append('status', status);
-    const res = await fetch(`/admin-panel/order/${orderId}/status/`, {
-        method: 'POST',
-        headers: { 'X-CSRFToken': csrfToken },
-        body: formData
-    });
+    const res = await fetch(`/admin-panel/order/${orderId}/status/`, { method: 'POST', headers: { 'X-CSRFToken': csrfToken }, body: formData });
     const data = await res.json();
     if (data.success) {
-        // อัปเดต data-status ของ card
-        const card = document.getElementById('order-card-' + orderId);
-        card.dataset.status = status;
-        // อัปเดตสี select
+        document.getElementById('order-card-' + orderId).dataset.status = status;
         const sel = document.getElementById('status-select-' + orderId);
         sel.className = sel.className.replace(/bg-\w+-50 text-\w+-700 border-\w+-200/g, '');
         const colorMap = {
@@ -401,21 +344,14 @@ async function updateOrderStatus(orderId, status) {
             done:      'bg-green-50 text-green-700 border-green-200',
         };
         sel.classList.add(...colorMap[status].split(' '));
-        // อัปเดต badge จำนวนออเดอร์ที่ต้องจัดการ
         updateActiveOrdersBadge();
-    } else {
-        alert('เปลี่ยนสถานะไม่สำเร็จ');
     }
 }
-
 function updateActiveOrdersBadge() {
-    // นับ card ที่ยังเป็น pending หรือ confirmed
     const activeCount = document.querySelectorAll('.order-card[data-status="pending"], .order-card[data-status="confirmed"]').length;
     const tabBtn = document.getElementById('tab-orders');
-    // ลบ badge เก่าออก
     const oldBadge = tabBtn.querySelector('span');
     if (oldBadge) oldBadge.remove();
-    // ใส่ badge ใหม่ถ้ายังมีออเดอร์ค้างอยู่
     if (activeCount > 0) {
         const badge = document.createElement('span');
         badge.className = 'ml-1 bg-amber-500 text-white text-xs px-1.5 py-0.5 rounded-full';
@@ -425,25 +361,61 @@ function updateActiveOrdersBadge() {
 }
 
 /* ─── Slip Modal ─── */
-function openSlipModal(url) {
-    document.getElementById('slip-modal-img').src = url;
-    document.getElementById('slip-modal').classList.remove('hidden');
-}
-function closeSlipModal() {
-    document.getElementById('slip-modal').classList.add('hidden');
+function openSlipModal(url) { document.getElementById('slip-modal-img').src = url; document.getElementById('slip-modal').classList.remove('hidden'); }
+function closeSlipModal() { document.getElementById('slip-modal').classList.add('hidden'); }
+
+
+/* ─── Product Modal (รวมระบบ SKU และ Promotion) ─── */
+
+function addSkuRow(name = '', price = '') {
+    const container = document.getElementById('skus-container');
+    const row = document.createElement('div');
+    row.className = 'flex gap-2 sku-row items-center';
+    row.innerHTML = `
+        <input type="text" placeholder="เช่น รสช็อกโกแลต" value="${name}" class="sku-name flex-1 border rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-amber-400 focus:outline-none">
+        <input type="number" placeholder="ราคา" value="${price}" class="sku-price w-24 border rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-amber-400 focus:outline-none">
+        <button onclick="this.parentElement.remove()" class="text-red-400 hover:text-red-600 font-bold px-1 text-xl leading-none">×</button>
+    `;
+    container.appendChild(row);
 }
 
-/* ─── Product Modal ─── */
+function addPromoRow(qty = '', price = '') {
+    const container = document.getElementById('promos-container');
+    const row = document.createElement('div');
+    row.className = 'flex gap-2 promo-row items-center bg-gray-50 p-2 rounded-lg';
+    row.innerHTML = `
+        <span class="text-xs text-gray-500 whitespace-nowrap">ซื้อครบ</span>
+        <input type="number" placeholder="ชิ้น" value="${qty}" class="promo-qty w-16 border rounded-lg px-2 py-1.5 text-sm text-center focus:ring-2 focus:ring-amber-400 focus:outline-none">
+        <span class="text-xs text-gray-500 whitespace-nowrap">เหลือชิ้นละ</span>
+        <input type="number" placeholder="บาท" value="${price}" class="promo-price w-20 border rounded-lg px-2 py-1.5 text-sm text-center focus:ring-2 focus:ring-amber-400 focus:outline-none">
+        <button onclick="this.parentElement.remove()" class="text-red-400 hover:text-red-600 font-bold px-1 text-xl leading-none ml-auto">×</button>
+    `;
+    container.appendChild(row);
+}
+
 function openModal(title = 'เพิ่มสินค้า') {
     document.getElementById('modal-title').textContent = title;
     document.getElementById('modal').classList.remove('hidden');
+    
+    // ถ้าเป็นการกดเพิ่มสินค้าใหม่ ให้มีกล่อง SKU รอไว้อันนึงเผื่อตั้งราคาปกติ
+    if(title === 'เพิ่มสินค้า') {
+        if(document.getElementById('skus-container').children.length === 0) {
+            addSkuRow('ปกติ', '');
+        }
+    }
 }
+
 function closeModal() {
     document.getElementById('modal').classList.add('hidden');
     ['prod-id','prod-name','prod-price','prod-desc'].forEach(id => document.getElementById(id).value = '');
     document.getElementById('prod-img-file').value = '';
     document.getElementById('img-preview-wrap').classList.add('hidden');
+    
+    // เคลียร์กล่อง SKU และ Promo ออกให้หมดเพื่อรอรอบใหม่
+    document.getElementById('skus-container').innerHTML = '';
+    document.getElementById('promos-container').innerHTML = '';
 }
+
 function previewImage(event) {
     const file = event.target.files[0];
     if (file) {
@@ -455,6 +427,7 @@ function previewImage(event) {
         reader.readAsDataURL(file);
     }
 }
+
 async function saveProduct() {
     const id = document.getElementById('prod-id').value;
     const formData = new FormData();
@@ -463,15 +436,34 @@ async function saveProduct() {
     formData.append('description', document.getElementById('prod-desc').value);
     const imgFile = document.getElementById('prod-img-file').files[0];
     if (imgFile) formData.append('image', imgFile);
+
+    // รวบรวมข้อมูล SKU ที่กรอกทั้งหมด
+    const skus = Array.from(document.querySelectorAll('.sku-row')).map(row => ({
+        name: row.querySelector('.sku-name').value.trim(),
+        price: row.querySelector('.sku-price').value
+    })).filter(s => s.name && s.price); // กรองเอาเฉพาะอันที่กรอกครบ
+
+    // รวบรวมข้อมูล Promotion ที่กรอกทั้งหมด
+    const promos = Array.from(document.querySelectorAll('.promo-row')).map(row => ({
+        min_quantity: row.querySelector('.promo-qty').value,
+        special_price: row.querySelector('.promo-price').value
+    })).filter(p => p.min_quantity && p.special_price);
+
+    // ยัดใส่ FormData ในรูปแบบข้อความ JSON
+    formData.append('skus', JSON.stringify(skus));
+    formData.append('promos', JSON.stringify(promos));
+
     const url = id ? `/admin-panel/edit/${id}/` : '/admin-panel/add/';
     const res = await fetch(url, { method: 'POST', headers: { 'X-CSRFToken': csrfToken }, body: formData });
     const data = await res.json();
     if (data.success) { closeModal(); location.reload(); }
-    else alert('กรุณากรอกข้อมูลให้ครบ');
+    else alert('กรุณากรอกข้อมูลให้ครบ (โดยเฉพาะชื่อสินค้าและราคาเริ่มต้น)');
 }
+
 async function editProduct(id) {
     const res = await fetch(`/admin-panel/edit/${id}/`);
     const data = await res.json();
+    
     document.getElementById('prod-id').value = data.id;
     document.getElementById('prod-name').value = data.name;
     document.getElementById('prod-price').value = data.price;
@@ -480,6 +472,21 @@ async function editProduct(id) {
         document.getElementById('img-preview').src = data.image_url;
         document.getElementById('img-preview-wrap').classList.remove('hidden');
     }
+
+    // วาดกล่อง SKU เดิมกลับมา
+    document.getElementById('skus-container').innerHTML = '';
+    if(data.skus && data.skus.length > 0) {
+        data.skus.forEach(s => addSkuRow(s.name, s.price));
+    } else {
+        addSkuRow('ปกติ', data.price);
+    }
+
+    // วาดกล่อง Promotion เดิมกลับมา
+    document.getElementById('promos-container').innerHTML = '';
+    if(data.promos && data.promos.length > 0) {
+        data.promos.forEach(p => addPromoRow(p.min_quantity, p.special_price));
+    }
+
     openModal('แก้ไขสินค้า');
 }
 async function deleteProduct(id) {
