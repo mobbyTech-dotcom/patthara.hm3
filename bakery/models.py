@@ -3,17 +3,15 @@ from cloudinary.models import CloudinaryField
 import random
 import string
 
-
 def generate_order_number():
     """สร้างเลขออเดอร์สุ่ม 8 หลัก เช่น PT-A3X9K2MQ"""
     chars = string.ascii_uppercase + string.digits
     suffix = ''.join(random.choices(chars, k=8))
     return f'PT-{suffix}'
 
-
 class Product(models.Model):
     name        = models.CharField(max_length=200, verbose_name='ชื่อสินค้า')
-    price       = models.PositiveIntegerField(verbose_name='ราคา (บาท)')
+    price       = models.PositiveIntegerField(verbose_name='ราคาเริ่มต้น (บาท)')
     description = models.TextField(blank=True, verbose_name='รายละเอียด')
     image       = CloudinaryField('image', folder='patthara/products')
     is_available = models.BooleanField(default=True, verbose_name='เปิดขาย')
@@ -27,6 +25,30 @@ class Product(models.Model):
     def __str__(self):
         return self.name
 
+class ProductSKU(models.Model):
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='skus')
+    name    = models.CharField(max_length=100, verbose_name='ชื่อตัวเลือก (เช่น รสช็อกโกแลต)')
+    price   = models.PositiveIntegerField(verbose_name='ราคา (บาท)')
+
+    class Meta:
+        verbose_name        = 'ตัวเลือกสินค้า (SKU)'
+        verbose_name_plural = 'ตัวเลือกสินค้า (SKUs)'
+
+    def __str__(self):
+        return f"{self.product.name} - {self.name}"
+
+class Promotion(models.Model):
+    product       = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='promotions')
+    min_quantity  = models.PositiveIntegerField(verbose_name='ซื้อครบ (ชิ้น)')
+    special_price = models.PositiveIntegerField(verbose_name='ราคาพิเศษต่อชิ้น (บาท)')
+
+    class Meta:
+        verbose_name        = 'โปรโมชั่น'
+        verbose_name_plural = 'โปรโมชั่น'
+        ordering            = ['-min_quantity']
+
+    def __str__(self):
+        return f"ซื้อ {self.min_quantity} ชิ้น เหลือชิ้นละ {self.special_price} บาท"
 
 class Order(models.Model):
     STATUS_CHOICES = [
@@ -65,7 +87,6 @@ class Order(models.Model):
             'done':      'bg-green-100 text-green-700',
         }.get(self.status, 'bg-gray-100 text-gray-500')
 
-
 class OrderItem(models.Model):
     order        = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='items')
     product_name = models.CharField(max_length=200)
@@ -79,9 +100,7 @@ class OrderItem(models.Model):
     def __str__(self):
         return f'{self.product_name} x{self.quantity}'
 
-
 class PaymentInfo(models.Model):
-    """ข้อมูลการชำระเงิน — singleton"""
     bank_name      = models.CharField(max_length=100, verbose_name='ชื่อธนาคาร', blank=True)
     account_number = models.CharField(max_length=50,  verbose_name='เลขที่บัญชี', blank=True)
     account_name   = models.CharField(max_length=200, verbose_name='ชื่อบัญชี',   blank=True)
