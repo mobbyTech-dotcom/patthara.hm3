@@ -2,6 +2,7 @@ from django.db import models
 from cloudinary.models import CloudinaryField
 import random
 import string
+from django.db import models
 
 def generate_order_number():
     """สร้างเลขออเดอร์สุ่ม 8 หลัก เช่น PT-A3X9K2MQ"""
@@ -40,6 +41,7 @@ class ProductSKU(models.Model):
 class Promotion(models.Model):
     product       = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='promotions')
     min_quantity  = models.PositiveIntegerField(verbose_name='ซื้อครบ (ชิ้น)')
+    discount_amount = models.PositiveIntegerField(default=0, verbose_name='ส่วนลดรวม (บาท)')
     special_price = models.PositiveIntegerField(verbose_name='ราคาพิเศษต่อชิ้น (บาท)')
 
     class Meta:
