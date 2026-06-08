@@ -379,16 +379,16 @@ function addSkuRow(name = '', price = '') {
     container.appendChild(row);
 }
 
-function addPromoRow(qty = '', price = '') {
+function addPromoRow(qty = '', price = '', discount = '') {
     const container = document.getElementById('promos-container');
     const row = document.createElement('div');
     row.className = 'flex gap-2 promo-row items-center bg-gray-50 p-2 rounded-lg';
     row.innerHTML = `
-        <span class="text-xs text-gray-500 whitespace-nowrap">ซื้อครบ</span>
-        <input type="number" placeholder="ชิ้น" value="${qty}" class="promo-qty w-16 border rounded-lg px-2 py-1.5 text-sm text-center focus:ring-2 focus:ring-amber-400 focus:outline-none">
-        <span class="text-xs text-gray-500 whitespace-nowrap">เหลือชิ้นละ</span>
-        <input type="number" placeholder="บาท" value="${price}" class="promo-price w-20 border rounded-lg px-2 py-1.5 text-sm text-center focus:ring-2 focus:ring-amber-400 focus:outline-none">
-        <button onclick="this.parentElement.remove()" class="text-red-400 hover:text-red-600 font-bold px-1 text-xl leading-none ml-auto">×</button>
+        <span class="text-xs text-gray-500">ซื้อ</span>
+        <input type="number" placeholder="ชิ้น" value="${qty}" class="promo-qty w-12 border rounded px-1 text-center text-sm">
+        <input type="number" placeholder="ราคาพิเศษ/ชิ้น" value="${price}" class="promo-price w-24 border rounded px-1 text-center text-sm">
+        <input type="number" placeholder="ส่วนลดรวม(บาท)" value="${discount}" class="promo-discount w-24 border rounded px-1 text-center text-sm">
+        <button onclick="this.parentElement.remove()" class="text-red-400 font-bold ml-auto px-2">×</button>
     `;
     container.appendChild(row);
 }
