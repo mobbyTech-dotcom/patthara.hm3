@@ -6,3 +6,4 @@ psycopg[binary]==3.2.13
 dj-database-url==2.1.0
 cloudinary==1.40.0
 django-cloudinary-storage==0.3.0
+dj-database-url
