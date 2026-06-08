@@ -227,7 +227,14 @@ def product_edit(request, pk):
 @require_POST
 def product_delete(request, pk):
     product = get_object_or_404(Product, pk=pk)
-    product.image.delete(save=False)
+    
+    # ดัก Error ไว้เผื่อสินค้านั้นไม่มีรูป หรือ Cloudinary ลบไม่ผ่าน
+    try:
+        if product.image:
+            product.image.delete(save=False)
+    except Exception:
+        pass
+        
     product.delete()
     return JsonResponse({'success': True})
 
