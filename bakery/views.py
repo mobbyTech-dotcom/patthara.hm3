@@ -288,16 +288,3 @@ def payment_delete_qr(request):
 
 def handler404(request, exception=None):
     return render(request, 'bakery/404.html', status=404)
-
-
-@login_required
-@require_POST
-def product_delete(request, pk):
-    product = get_object_or_404(Product, pk=pk)
-    try:
-        if product.image:
-            product.image.delete(save=False)
-    except Exception:
-        pass
-    product.delete()
-    return JsonResponse({'success': True})
