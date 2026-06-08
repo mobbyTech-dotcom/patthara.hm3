@@ -4,7 +4,8 @@ from django.contrib.auth import authenticate, login, logout
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
 from django.db.models import Sum, Count, F, ExpressionWrapper, IntegerField as IntField
-from .models import Product, Order, OrderItem, PaymentInfo
+# ⚠️ อย่าลืม Import ProductSKU และ Promotion เข้ามาด้วย
+from .models import Product, Order, OrderItem, PaymentInfo, ProductSKU, Promotion
 from .forms import ProductForm
 import json
 
@@ -15,7 +16,7 @@ def get_products_json():
     for p in products:
         skus = list(p.skus.values('id', 'name', 'price'))
         promos = list(p.promotions.order_by('-min_quantity').values('min_quantity', 'special_price'))
-        # ถ้าร้านยังไม่ได้ตั้ง SKU ให้ใช้สินค้าหลักเป็น 1 SKU อัตโนมัติ (กันระบบพัง)
+        # ถ้าร้านยังไม่ได้ตั้ง SKU ให้ใช้สินค้าหลักเป็น 1 SKU อัตโนมัติ
         if not skus:
             skus = [{'id': f'p_{p.id}', 'name': 'ปกติ', 'price': p.price}]
             
@@ -166,7 +167,20 @@ def admin_panel(request):
 def product_add(request):
     form = ProductForm(request.POST, request.FILES)
     if form.is_valid():
-        form.save()
+        product = form.save()
+        
+        # รับค่า SKU และ Promotion แบบ JSON 
+        try:
+            skus = json.loads(request.POST.get('skus', '[]'))
+            promos = json.loads(request.POST.get('promos', '[]'))
+            
+            for sku in skus:
+                ProductSKU.objects.create(product=product, name=sku['name'], price=sku['price'])
+            for promo in promos:
+                Promotion.objects.create(product=product, min_quantity=promo['min_quantity'], special_price=promo['special_price'])
+        except Exception:
+            pass # กันเหนียวเผื่อข้อมูลพัง
+            
         return JsonResponse({'success': True})
     return JsonResponse({'success': False, 'errors': form.errors})
 
@@ -177,15 +191,35 @@ def product_edit(request, pk):
     if request.method == 'POST':
         form = ProductForm(request.POST, request.FILES, instance=product)
         if form.is_valid():
-            form.save()
+            product = form.save()
+            
+            # ลบ SKU และ Promotion เดิมทิ้งก่อนสร้างใหม่
+            product.skus.all().delete()
+            product.promotions.all().delete()
+            
+            try:
+                skus = json.loads(request.POST.get('skus', '[]'))
+                promos = json.loads(request.POST.get('promos', '[]'))
+                
+                for sku in skus:
+                    ProductSKU.objects.create(product=product, name=sku['name'], price=sku['price'])
+                for promo in promos:
+                    Promotion.objects.create(product=product, min_quantity=promo['min_quantity'], special_price=promo['special_price'])
+            except Exception:
+                pass
+
             return JsonResponse({'success': True})
         return JsonResponse({'success': False, 'errors': form.errors})
+    
+    # ถ้าเป็น GET (เปิดดูข้อมูล) ให้ส่งข้อมูล SKU/Promo กลับไปด้วย
     return JsonResponse({
         'id':          product.id,
         'name':        product.name,
         'price':       product.price,
         'description': product.description,
         'image_url':   product.image.url if product.image else '',
+        'skus':        list(product.skus.values('name', 'price')),
+        'promos':      list(product.promotions.values('min_quantity', 'special_price')),
     })
 
 
