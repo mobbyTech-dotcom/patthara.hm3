@@ -289,16 +289,7 @@ def payment_delete_qr(request):
 def handler404(request, exception=None):
     return render(request, 'bakery/404.html', status=404)
 
-# (ส่วนของฟังก์ชัน product_add และ product_edit)
-for promo in promos:
-    Promotion.objects.create(
-        product=product, 
-        min_quantity=promo['min_quantity'], 
-        special_price=promo.get('special_price', 0),
-        discount_amount=promo.get('discount_amount', 0)
-    )
 
-# (ฟังก์ชัน product_delete)
 @login_required
 @require_POST
 def product_delete(request, pk):
