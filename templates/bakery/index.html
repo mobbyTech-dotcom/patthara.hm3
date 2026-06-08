@@ -1,0 +1,122 @@
+{% extends 'base.html' %}
+{% block title %}ภัทรา Homemade - ขนมอบสดใหม่{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto px-4 py-8">
+    <div class="text-center mb-10">
+        <h1 class="text-4xl font-bold text-amber-800 mb-2">🧁 ภัทรา Homemade</h1>
+        <p class="text-amber-600 text-lg">ขนมอบสดใหม่ ทำด้วยใจ</p>
+    </div>
+
+    {% if products %}
+    <!-- รายการสินค้า -->
+    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-6">
+        {% for product in products %}
+        <div class="bg-white rounded-2xl shadow-sm overflow-hidden hover:shadow-md transition flex flex-col">
+            {% if product.image %}
+            <img src="{{ product.image.url }}" alt="{{ product.name }}" class="w-full h-40 object-cover">
+            {% else %}
+            <div class="w-full h-40 bg-amber-100 flex items-center justify-center text-4xl">🧁</div>
+            {% endif %}
+            <div class="p-3 flex flex-col flex-1">
+                <h3 class="font-semibold text-gray-800 text-sm">{{ product.name }}</h3>
+                {% if product.description %}
+                <p class="text-gray-500 text-xs mt-1 line-clamp-2 flex-1">{{ product.description }}</p>
+                {% endif %}
+                <p class="text-amber-700 font-bold mt-2 mb-3">฿{{ product.price }}</p>
+                <!-- ปุ่มเพิ่ม/ลด จำนวน -->
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                        <button onclick="changeQty({{ product.id }}, -1)"
+                                class="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 font-bold text-lg flex items-center justify-center transition">−</button>
+                        <span id="qty-{{ product.id }}" class="w-6 text-center font-bold text-gray-800 text-sm">0</span>
+                        <button onclick="changeQty({{ product.id }}, 1)"
+                                class="w-8 h-8 rounded-full bg-amber-500 hover:bg-amber-600 text-white font-bold text-lg flex items-center justify-center transition">+</button>
+                    </div>
+                    <span id="subtotal-{{ product.id }}" class="text-xs text-amber-600 font-semibold hidden"></span>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- ตะกร้าสินค้า (แสดงเมื่อมีสินค้า) -->
+    <div id="cart-bar" class="hidden sticky bottom-4 z-30">
+        <div class="bg-amber-700 text-white rounded-2xl shadow-xl px-5 py-4 flex items-center justify-between gap-4">
+            <div>
+                <p class="text-sm opacity-80">ตะกร้าของคุณ (<span id="cart-count">0</span> รายการ)</p>
+                <p class="font-bold text-xl">฿<span id="cart-total">0</span></p>
+            </div>
+            <a href="{% url 'order_page' %}" id="cart-link"
+               class="bg-white text-amber-700 font-bold px-6 py-2.5 rounded-xl text-sm hover:bg-amber-50 transition whitespace-nowrap">
+                🛒 สั่งซื้อเลย
+            </a>
+        </div>
+    </div>
+
+    {% else %}
+    <div class="text-center py-20 text-gray-400">
+        <p class="text-5xl mb-4">🧁</p>
+        <p>ยังไม่มีสินค้าในขณะนี้</p>
+    </div>
+    {% endif %}
+
+    <div class="text-center mt-10 flex justify-center gap-6">
+        <a href="{% url 'track_order' %}" class="text-sm text-amber-600 hover:underline">📦 ติดตามออเดอร์</a>
+        <a href="{% url 'login' %}" class="text-xs text-gray-300 hover:text-gray-400">จัดการร้าน</a>
+    </div>
+</div>
+
+<script>
+// ข้อมูลสินค้าทั้งหมด
+const products = {
+    {% for product in products %}
+    {{ product.id }}: { name: "{{ product.name }}", price: {{ product.price }} },
+    {% endfor %}
+};
+
+// โหลด cart จาก sessionStorage (เพื่อให้ข้ามหน้าได้)
+let cart = {};
+try { cart = JSON.parse(sessionStorage.getItem('patthara_cart') || '{}'); } catch(e) {}
+
+// render ตั้งต้นจาก cart ที่บันทึกไว้
+Object.entries(cart).forEach(([id, qty]) => {
+    const qtyEl = document.getElementById('qty-' + id);
+    if (qtyEl) qtyEl.textContent = qty;
+});
+updateCartBar();
+
+function changeQty(id, delta) {
+    cart[id] = (cart[id] || 0) + delta;
+    if (cart[id] < 0) cart[id] = 0;
+    document.getElementById('qty-' + id).textContent = cart[id];
+
+    // อัปเดต subtotal label
+    const subEl = document.getElementById('subtotal-' + id);
+    if (cart[id] > 0) {
+        subEl.textContent = '฿' + (products[id].price * cart[id]).toLocaleString();
+        subEl.classList.remove('hidden');
+    } else {
+        subEl.classList.add('hidden');
+    }
+
+    sessionStorage.setItem('patthara_cart', JSON.stringify(cart));
+    updateCartBar();
+}
+
+function updateCartBar() {
+    const items = Object.entries(cart).filter(([, qty]) => qty > 0);
+    const bar = document.getElementById('cart-bar');
+    if (items.length === 0) { bar.classList.add('hidden'); return; }
+    bar.classList.remove('hidden');
+
+    let total = 0, count = 0;
+    items.forEach(([id, qty]) => {
+        total += (products[id]?.price || 0) * qty;
+        count += qty;
+    });
+    document.getElementById('cart-total').textContent = total.toLocaleString();
+    document.getElementById('cart-count').textContent = count;
+}
+</script>
+{% endblock %}

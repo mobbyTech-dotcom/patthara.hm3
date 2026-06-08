@@ -1,0 +1,149 @@
+{% extends 'base.html' %}
+{% block title %}ติดตามออเดอร์ - ภัทรา Homemade{% endblock %}
+
+{% block content %}
+<div class="max-w-lg mx-auto px-4 py-8">
+    <div class="text-center mb-8">
+        <h1 class="text-3xl font-bold text-amber-800">📦 ติดตามออเดอร์</h1>
+        <p class="text-amber-600 mt-1 text-sm">กรอกหมายเลขออเดอร์เพื่อเช็คสถานะ</p>
+        <a href="{% url 'index' %}" class="text-sm text-amber-500 hover:underline">← กลับหน้าร้าน</a>
+    </div>
+
+    <!-- ช่องค้นหา -->
+    <div class="bg-white rounded-2xl shadow-sm p-5 mb-6">
+        <form method="post">
+            {% csrf_token %}
+            <label class="block text-sm text-gray-600 mb-1">หมายเลขออเดอร์</label>
+            <div class="flex gap-2">
+                <input type="number" name="order_id" placeholder="เช่น 42"
+                       value="{{ request.POST.order_id }}"
+                       class="flex-1 border rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-amber-400 focus:outline-none">
+                <button type="submit"
+                        class="bg-amber-600 hover:bg-amber-700 text-white font-bold px-5 py-2.5 rounded-xl text-sm transition">
+                    ค้นหา
+                </button>
+            </div>
+        </form>
+    </div>
+
+    {% if error %}
+    <div class="bg-red-50 text-red-600 text-sm rounded-xl px-4 py-3 mb-4 text-center">
+        {{ error }}
+    </div>
+    {% endif %}
+
+    {% if order %}
+    <div class="bg-white rounded-2xl shadow-sm overflow-hidden">
+        <!-- Header -->
+        <div class="bg-amber-50 px-5 py-4 border-b flex items-center justify-between">
+            <div>
+                <p class="text-xs text-gray-500">ออเดอร์</p>
+                <p class="font-bold text-amber-800 text-lg">#{{ order.id }}</p>
+            </div>
+            <span class="px-3 py-1.5 rounded-full text-sm font-semibold {{ order.status_color }}">
+                {% if order.status == 'pending' %}⏳{% elif order.status == 'confirmed' %}✅{% else %}🎉{% endif %}
+                {{ order.status_label }}
+            </span>
+        </div>
+
+        <!-- Timeline -->
+        <div class="px-5 py-4 border-b">
+            <div class="flex items-center gap-0">
+                {% for s, label in order.STATUS_CHOICES %}
+                <div class="flex-1 flex flex-col items-center">
+                    <div class="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold
+                        {% if order.status == 'pending' and s == 'pending' %}bg-amber-500 text-white
+                        {% elif order.status == 'confirmed' and s != 'done' %}bg-amber-500 text-white
+                        {% elif order.status == 'done' %}bg-amber-500 text-white
+                        {% else %}bg-gray-200 text-gray-400{% endif %}">
+                        {% if s == 'pending' %}1{% elif s == 'confirmed' %}2{% else %}3{% endif %}
+                    </div>
+                    <p class="text-xs mt-1 text-center text-gray-600">{{ label }}</p>
+                </div>
+                {% if not forloop.last %}
+                <div class="flex-1 h-1 -mt-4
+                    {% if order.status == 'confirmed' or order.status == 'done' %}bg-amber-400
+                    {% else %}bg-gray-200{% endif %}"></div>
+                {% endif %}
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- ข้อมูล -->
+        <div class="px-5 py-4 space-y-2 text-sm border-b">
+            <div class="flex gap-2">
+                <span class="text-gray-500 w-24 flex-shrink-0">ชื่อลูกค้า</span>
+                <span class="font-semibold text-gray-800">{{ order.customer_name }}</span>
+            </div>
+            <div class="flex gap-2">
+                <span class="text-gray-500 w-24 flex-shrink-0">วันนัดรับ</span>
+                <span class="font-semibold text-amber-700">{{ order.appointment_date|date:"d F Y" }}</span>
+            </div>
+            <div class="flex gap-2">
+                <span class="text-gray-500 w-24 flex-shrink-0">ยอดรวม</span>
+                <span class="font-bold text-amber-700">฿{{ order.total }}</span>
+            </div>
+            {% if order.note %}
+            <div class="flex gap-2">
+                <span class="text-gray-500 w-24 flex-shrink-0">หมายเหตุ</span>
+                <span class="text-gray-700">{{ order.note }}</span>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- รายการสินค้า -->
+        <div class="px-5 py-4 border-b">
+            <p class="text-xs text-gray-500 mb-2 font-semibold uppercase tracking-wide">รายการสินค้า</p>
+            {% for item in order.items.all %}
+            <div class="flex justify-between text-sm py-1">
+                <span class="text-gray-700">{{ item.product_name }} × {{ item.quantity }}</span>
+                <span class="font-semibold text-gray-800">฿{{ item.subtotal }}</span>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- สลิป -->
+        <div class="px-5 py-4">
+            {% if order.slip_image %}
+            <p class="text-xs text-gray-500 mb-2 font-semibold">หลักฐานการชำระเงิน</p>
+            <img src="{{ order.slip_image.url }}" alt="สลิป"
+                 class="w-48 rounded-xl border object-cover">
+            <p class="text-xs text-green-600 mt-2">✅ ส่งสลิปแล้ว</p>
+            {% else %}
+            <p class="text-xs text-gray-500 mb-3 font-semibold">อัปโหลดสลิปการชำระเงิน</p>
+            <label class="block cursor-pointer" id="slip-label">
+                <div class="border-2 border-dashed border-amber-300 rounded-xl py-4 text-center text-sm text-amber-500 hover:bg-amber-50 transition">
+                    📎 แนบสลิปที่นี่
+                </div>
+                <input type="file" id="slip-file" accept="image/*" class="hidden" onchange="uploadSlip({{ order.id }})">
+            </label>
+            <p id="slip-msg" class="hidden text-xs text-green-600 mt-2 text-center">✅ อัปโหลดสลิปสำเร็จ!</p>
+            <p id="slip-err" class="hidden text-xs text-red-500 mt-2 text-center"></p>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+async function uploadSlip(orderId) {
+    const file = document.getElementById('slip-file').files[0];
+    if (!file) return;
+    const formData = new FormData();
+    formData.append('slip_image', file);
+    const res = await fetch(`/order/receipt/${orderId}/slip/`, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': '{{ csrf_token }}' },
+        body: formData
+    });
+    const data = await res.json();
+    if (data.success) {
+        document.getElementById('slip-label').classList.add('hidden');
+        document.getElementById('slip-msg').classList.remove('hidden');
+    } else {
+        document.getElementById('slip-err').textContent = 'อัปโหลดไม่สำเร็จ กรุณาลองใหม่';
+        document.getElementById('slip-err').classList.remove('hidden');
+    }
+}
+</script>
+{% endblock %}

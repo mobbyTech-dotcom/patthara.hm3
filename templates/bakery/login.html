@@ -1,0 +1,37 @@
+{% extends 'base.html' %}
+{% block title %}เข้าสู่ระบบ - ภัทรา Homemade{% endblock %}
+
+{% block content %}
+<div class="min-h-screen flex items-center justify-center px-4">
+    <div class="bg-white rounded-2xl shadow-lg p-8 w-full max-w-sm">
+        <h1 class="text-2xl font-bold text-amber-800 text-center mb-6">🔐 เข้าสู่ระบบ</h1>
+
+        {% if error %}
+        <div class="bg-red-50 text-red-600 text-sm rounded-xl px-4 py-3 mb-4">{{ error }}</div>
+        {% endif %}
+
+        <form method="post">
+            {% csrf_token %}
+            <div class="mb-4">
+                <label class="block text-sm text-gray-600 mb-1">ชื่อผู้ใช้</label>
+                <input type="text" name="username"
+                       class="w-full border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+                       autofocus>
+            </div>
+            <div class="mb-6">
+                <label class="block text-sm text-gray-600 mb-1">รหัสผ่าน</label>
+                <input type="password" name="password"
+                       class="w-full border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400">
+            </div>
+            <button type="submit"
+                    class="w-full bg-amber-600 hover:bg-amber-700 text-white font-semibold py-2.5 rounded-xl transition">
+                เข้าสู่ระบบ
+            </button>
+        </form>
+
+        <div class="text-center mt-4">
+            <a href="{% url 'index' %}" class="text-sm text-amber-600 hover:underline">← กลับหน้าร้าน</a>
+        </div>
+    </div>
+</div>
+{% endblock %}
