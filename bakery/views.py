@@ -125,7 +125,7 @@ def logout_view(request):
 
 @login_required
 def admin_panel(request):
-    products = Product.objects.all()
+    products = Product.objects.prefetch_related('skus', 'promotions').all()
     orders   = Order.objects.prefetch_related('items').all()
     form     = ProductForm()
     payment  = PaymentInfo.get_singleton()
