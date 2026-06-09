@@ -19,7 +19,7 @@ def get_products_json():
         promos = list(p.promotions.order_by('-min_quantity').values('min_quantity', 'special_price'))
         # ถ้าร้านยังไม่ได้ตั้ง SKU ให้ใช้สินค้าหลักเป็น 1 SKU อัตโนมัติ (กันระบบพัง)
         if not skus:
-            skus = [{'id': f'p_{p.id}', 'name': 'ปกติ', 'price': p.price}]
+            skus = [{'id': f'p_{p.id}', 'name': 'ปกติ', 'price': 0}]
             
         data[p.id] = {
             'id': p.id,
@@ -217,7 +217,7 @@ def product_edit(request, pk):
     return JsonResponse({
         'id':          product.id,
         'name':        product.name,
-        'price':       product.price,
+        
         'description': product.description,
         'image_url':   product.image.url if product.image else '',
         'skus':        list(product.skus.values('name', 'price')),
