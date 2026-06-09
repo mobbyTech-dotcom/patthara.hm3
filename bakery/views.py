@@ -5,7 +5,6 @@ from django.http import JsonResponse
 from django.views.decorators.http import require_POST
 from django.db.models import Sum, Count, F, ExpressionWrapper, IntegerField as IntField
 
-# ⚠️ จุดสำคัญ: ต้องแน่ใจว่ามี ProductSKU และ Promotion อยู่ในบรรทัดนี้ครับ
 from .models import Product, Order, OrderItem, PaymentInfo, ProductSKU, Promotion
 from .forms import ProductForm
 import json
@@ -15,11 +14,20 @@ def get_products_json():
     products = Product.objects.filter(is_available=True).prefetch_related('skus', 'promotions')
     data = {}
     for p in products:
-        skus = list(p.skus.values('id', 'name', 'price'))
-        promos = list(p.promotions.order_by('-min_quantity').values('min_quantity', 'promo_type', 'special_price', 'discount'))
-        # ถ้าร้านยังไม่ได้ตั้ง SKU ให้ใช้สินค้าหลักเป็น 1 SKU อัตโนมัติ (กันระบบพัง)
+        # เพิ่มการส่ง image_url ของ SKU ไปให้หน้าเว็บด้วย (ถ้ามี)
+        skus = []
+        for sku in p.skus.all():
+            skus.append({
+                'id': sku.id, 
+                'name': sku.name, 
+                'price': sku.price,
+                'image_url': sku.image.url if sku.image else ''
+            })
+            
+        promos = list(p.promotions.order_by('-min_quantity').values('min_quantity', 'special_price', 'discount'))
+        
         if not skus:
-            skus = [{'id': f'p_{p.id}', 'name': 'ปกติ', 'price': 0}]
+            skus = [{'id': f'p_{p.id}', 'name': 'ปกติ', 'price': p.price, 'image_url': ''}]
             
         data[p.id] = {
             'id': p.id,
@@ -125,12 +133,16 @@ def logout_view(request):
 
 @login_required
 def admin_panel(request):
-    products = Product.objects.prefetch_related('skus', 'promotions').all()
+    products = Product.objects.all()
     orders   = Order.objects.prefetch_related('items').all()
     form     = ProductForm()
     payment  = PaymentInfo.get_singleton()
 
-    active_orders_count = Order.objects.filter(status__in=['pending', 'confirmed']).count()
+    # ✅ เพิ่มตัวแปรนับยอด (Pending & Confirmed) สำหรับไปโชว์ในหน้า admin.html
+    pending_count = Order.objects.filter(status='pending').count()
+    confirmed_count = Order.objects.filter(status='confirmed').count()
+    active_orders_count = pending_count + confirmed_count
+    
     done_orders = Order.objects.filter(status='done')
     sales_total = done_orders.aggregate(total=Sum('total'))['total'] or 0
     done_count  = done_orders.count()
@@ -156,6 +168,8 @@ def admin_panel(request):
         'orders':               orders,
         'form':                 form,
         'payment':              payment,
+        'pending_count':        pending_count,
+        'confirmed_count':      confirmed_count,
         'active_orders_count':  active_orders_count,
         'sales_total':          sales_total,
         'done_count':           done_count,
@@ -169,7 +183,6 @@ def product_add(request):
     form = ProductForm(request.POST, request.FILES)
     if form.is_valid():
         product = form.save()
-        
         try:
             skus = json.loads(request.POST.get('skus', '[]'))
             promos = json.loads(request.POST.get('promos', '[]'))
@@ -177,17 +190,14 @@ def product_add(request):
             for sku in skus:
                 ProductSKU.objects.create(product=product, name=sku['name'], price=sku['price'])
             for promo in promos:
-                ptype = promo.get('promo_type', 'special_price')
                 Promotion.objects.create(
-                    product=product,
-                    min_quantity=promo['min_quantity'],
-                    promo_type=ptype,
-                    special_price=promo.get('special_price') or None,
-                    discount=promo.get('discount') or None,
+                    product=product, 
+                    min_quantity=promo['min_quantity'], 
+                    special_price=promo.get('special_price') or 0,
+                    discount=promo.get('discount_amount') or 0
                 )
         except Exception as e:
             print("Error saving SKUs/Promos:", e)
-            pass
             
         return JsonResponse({'success': True})
     return JsonResponse({'success': False, 'errors': form.errors})
@@ -200,9 +210,7 @@ def product_edit(request, pk):
         form = ProductForm(request.POST, request.FILES, instance=product)
         if form.is_valid():
             product = form.save()
-            
             try:
-                # ลบ SKU และ Promotion เดิมทิ้งก่อนสร้างใหม่
                 product.skus.all().delete()
                 product.promotions.all().delete()
                 
@@ -212,18 +220,14 @@ def product_edit(request, pk):
                 for sku in skus:
                     ProductSKU.objects.create(product=product, name=sku['name'], price=sku['price'])
                 for promo in promos:
-                    ptype = promo.get('promo_type', 'special_price')
                     Promotion.objects.create(
-                        product=product,
-                        min_quantity=promo['min_quantity'],
-                        promo_type=ptype,
-                        special_price=promo.get('special_price') or None,
-                        discount=promo.get('discount') or None,
+                        product=product, 
+                        min_quantity=promo['min_quantity'], 
+                        special_price=promo.get('special_price') or 0,
+                        discount=promo.get('discount_amount') or 0
                     )
             except Exception as e:
-                # ปริ้นท์ Error เผื่อไว้ดูในหน้า Logs ของ Render
                 print("Error Edit SKU/Promo:", e)
-                pass
 
             return JsonResponse({'success': True})
         return JsonResponse({'success': False, 'errors': form.errors})
@@ -231,11 +235,11 @@ def product_edit(request, pk):
     return JsonResponse({
         'id':          product.id,
         'name':        product.name,
-        
+        'price':       product.price,
         'description': product.description,
         'image_url':   product.image.url if product.image else '',
         'skus':        list(product.skus.values('name', 'price')),
-        'promos':      list(product.promotions.values('min_quantity', 'promo_type', 'special_price', 'discount')),
+        'promos':      list(product.promotions.values('min_quantity', 'special_price', 'discount')),
     })
 
 
@@ -271,6 +275,22 @@ def order_update_status(request, order_id):
         order.save()
         return JsonResponse({'success': True, 'status': status, 'label': order.status_label})
     return JsonResponse({'success': False, 'error': 'invalid status'})
+
+
+# ✅ Endpoint ใหม่สำหรับแก้ไขข้อมูลลูกค้าจาก Modal หน้า Admin
+@login_required
+@require_POST
+def order_update_customer(request, order_id):
+    order = get_object_or_404(Order, id=order_id)
+    order.customer_name = request.POST.get('customer_name', order.customer_name)
+    order.phone = request.POST.get('phone', order.phone)
+    order.address = request.POST.get('address', order.address)
+    date_str = request.POST.get('appointment_date')
+    if date_str:
+        order.appointment_date = date_str
+    order.note = request.POST.get('note', order.note)
+    order.save()
+    return JsonResponse({'success': True})
 
 
 @login_required
