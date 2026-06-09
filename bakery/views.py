@@ -15,12 +15,7 @@ def get_products_json():
     for p in products:
         skus = []
         for sku in p.skus.all():
-            skus.append({
-                'id': sku.id, 
-                'name': sku.name, 
-                'price': sku.price,
-                'image_url': sku.image.url if sku.image else ''
-            })
+            skus.append({'id': sku.id, 'name': sku.name, 'price': sku.price, 'image_url': sku.image.url if sku.image else ''})
             
         promos = list(p.promotions.order_by('-min_quantity').values('min_quantity', 'promo_type', 'special_price', 'discount'))
         
@@ -37,17 +32,14 @@ def get_products_json():
         }
     return json.dumps(data)
 
-
 def index(request):
     products = Product.objects.filter(is_available=True)
     products_json = get_products_json()
     return render(request, 'bakery/index.html', {'products': products, 'products_json': products_json})
 
-
 def order_page(request):
     products_json = get_products_json()
     return render(request, 'bakery/order.html', {'products_json': products_json})
-
 
 def create_order(request):
     if request.method == 'POST':
@@ -73,12 +65,10 @@ def create_order(request):
         return JsonResponse({'success': True, 'order_id': order.order_number})
     return JsonResponse({'success': False})
 
-
 def order_receipt(request, order_number):
     order   = get_object_or_404(Order, order_number=order_number)
     payment = PaymentInfo.get_singleton()
     return render(request, 'bakery/receipt.html', {'order': order, 'payment': payment})
-
 
 def upload_slip(request, order_number):
     order = get_object_or_404(Order, order_number=order_number)
@@ -90,7 +80,6 @@ def upload_slip(request, order_number):
             return JsonResponse({'success': True})
         return JsonResponse({'success': False, 'error': 'ไม่พบไฟล์'})
     return JsonResponse({'success': False})
-
 
 def track_order(request):
     order = None
@@ -105,7 +94,6 @@ def track_order(request):
         else:
             error = 'กรุณากรอกหมายเลขออเดอร์'
     return render(request, 'bakery/track.html', {'order': order, 'error': error})
-
 
 def login_view(request):
     if request.user.is_authenticated:
@@ -124,11 +112,9 @@ def login_view(request):
             return redirect('admin_panel')
     return render(request, 'bakery/login.html', {'error': error})
 
-
 def logout_view(request):
     logout(request)
     return redirect('index')
-
 
 @login_required
 def admin_panel(request):
@@ -149,14 +135,10 @@ def admin_panel(request):
         OrderItem.objects
         .filter(order__status='done')
         .values('product_name')
-        .annotate(
-            total_qty=Sum('quantity'),
-            total_revenue=Sum(ExpressionWrapper(F('price') * F('quantity'), output_field=IntField()))
-        )
+        .annotate(total_qty=Sum('quantity'), total_revenue=Sum(ExpressionWrapper(F('price') * F('quantity'), output_field=IntField())))
         .order_by('-total_qty')
     )
 
-    # ✅ สรุปยอดขนมที่ต้องทำ (จากสถานะ pending และ confirmed)
     todo_summary_list = list(
         OrderItem.objects
         .filter(order__status__in=['pending', 'confirmed'])
@@ -179,7 +161,6 @@ def admin_panel(request):
         'todo_summary':         todo_summary_list,
     })
 
-
 @login_required
 @require_POST
 def product_add(request):
@@ -190,23 +171,20 @@ def product_add(request):
             skus = json.loads(request.POST.get('skus', '[]'))
             promos = json.loads(request.POST.get('promos', '[]'))
             
-            for sku in skus:
-                ProductSKU.objects.create(product=product, name=sku['name'], price=sku['price'])
+            for item in skus:
+                idx = item.get('originalIndex')
+                image_file = request.FILES.get(f'sku_image_{idx}')
+                ProductSKU.objects.create(product=product, name=item['name'], price=item['price'], image=image_file)
+                
             for promo in promos:
                 Promotion.objects.create(
-                    product=product, 
-                    min_quantity=promo['min_quantity'], 
-                    promo_type=promo.get('promo_type', 'special_price'),
-                    special_price=promo.get('special_price') or 0,
-                    discount=promo.get('discount') or 0
+                    product=product, min_quantity=promo['min_quantity'], promo_type=promo.get('promo_type', 'special_price'),
+                    special_price=promo.get('special_price') or 0, discount=promo.get('discount') or 0
                 )
         except Exception as e:
             print("Error saving SKUs/Promos:", e)
-            pass
-            
         return JsonResponse({'success': True})
     return JsonResponse({'success': False, 'errors': form.errors})
-
 
 @login_required
 def product_edit(request, pk):
@@ -216,30 +194,40 @@ def product_edit(request, pk):
         if form.is_valid():
             product = form.save()
             try:
-                product.skus.all().delete()
+                skus_data = json.loads(request.POST.get('skus', '[]'))
+                existing_skus = {str(sku.id): sku for sku in product.skus.all()}
+                kept_sku_ids = []
+                
+                for item in skus_data:
+                    idx = item.get('originalIndex')
+                    image_file = request.FILES.get(f'sku_image_{idx}')
+                    sku_id = str(item.get('id', ''))
+                    
+                    if sku_id and sku_id in existing_skus:
+                        sku = existing_skus[sku_id]
+                        sku.name = item['name']
+                        sku.price = item['price']
+                        if image_file: sku.image = image_file
+                        sku.save()
+                        kept_sku_ids.append(sku.id)
+                    else:
+                        new_sku = ProductSKU.objects.create(product=product, name=item['name'], price=item['price'], image=image_file)
+                        kept_sku_ids.append(new_sku.id)
+                
+                product.skus.exclude(id__in=kept_sku_ids).delete()
+                
                 product.promotions.all().delete()
-                
-                skus = json.loads(request.POST.get('skus', '[]'))
                 promos = json.loads(request.POST.get('promos', '[]'))
-                
-                for sku in skus:
-                    ProductSKU.objects.create(product=product, name=sku['name'], price=sku['price'])
                 for promo in promos:
                     Promotion.objects.create(
-                        product=product, 
-                        min_quantity=promo['min_quantity'], 
-                        promo_type=promo.get('promo_type', 'special_price'),
-                        special_price=promo.get('special_price') or 0,
-                        discount=promo.get('discount') or 0
+                        product=product, min_quantity=promo['min_quantity'], promo_type=promo.get('promo_type', 'special_price'),
+                        special_price=promo.get('special_price') or 0, discount=promo.get('discount') or 0
                     )
             except Exception as e:
                 print("Error Edit SKU/Promo:", e)
-                pass
-
             return JsonResponse({'success': True})
         return JsonResponse({'success': False, 'errors': form.errors})
     
-    # ✅ ใช้ base_price แทน price ที่ถูกลบไป
     fallback_price = getattr(product, 'price', getattr(product, 'base_price', 0))
     return JsonResponse({
         'id':          product.id,
@@ -247,23 +235,19 @@ def product_edit(request, pk):
         'price':       fallback_price,
         'description': product.description,
         'image_url':   product.image.url if product.image else '',
-        'skus':        [{'name': s.name, 'price': s.price, 'image_url': s.image.url if s.image else ''} for s in product.skus.all()],
+        'skus':        [{'id': s.id, 'name': s.name, 'price': s.price, 'image_url': s.image.url if s.image else ''} for s in product.skus.all()],
         'promos':      list(product.promotions.values('min_quantity', 'promo_type', 'special_price', 'discount')),
     })
-
 
 @login_required
 @require_POST
 def product_delete(request, pk):
     product = get_object_or_404(Product, pk=pk)
     try:
-        if product.image:
-            product.image.delete(save=False)
-    except Exception:
-        pass
+        if product.image: product.image.delete(save=False)
+    except Exception: pass
     product.delete()
     return JsonResponse({'success': True})
-
 
 @login_required
 @require_POST
@@ -272,7 +256,6 @@ def product_toggle(request, pk):
     product.is_available = not product.is_available
     product.save()
     return JsonResponse({'success': True, 'is_available': product.is_available})
-
 
 @login_required
 @require_POST
@@ -284,7 +267,6 @@ def order_update_status(request, order_id):
         order.save()
         return JsonResponse({'success': True, 'status': status, 'label': order.status_label})
     return JsonResponse({'success': False, 'error': 'invalid status'})
-
 
 @login_required
 @require_POST
@@ -300,6 +282,16 @@ def order_update_customer(request, order_id):
     order.save()
     return JsonResponse({'success': True})
 
+# ✅ ฟังก์ชันใหม่สำหรับ "ยกเลิกออเดอร์" โดยเฉพาะ
+@login_required
+@require_POST
+def order_cancel(request, order_id):
+    order = get_object_or_404(Order, id=order_id)
+    reason = request.POST.get('cancel_reason', '').strip()
+    order.status = 'cancelled'
+    order.cancel_reason = reason
+    order.save()
+    return JsonResponse({'success': True})
 
 @login_required
 @require_POST
@@ -310,12 +302,10 @@ def payment_update(request):
     payment.account_name   = request.POST.get('account_name', '').strip()
     qr_file = request.FILES.get('qr_image')
     if qr_file:
-        if payment.qr_image:
-            payment.qr_image.delete(save=False)
+        if payment.qr_image: payment.qr_image.delete(save=False)
         payment.qr_image = qr_file
     payment.save()
     return JsonResponse({'success': True})
-
 
 @login_required
 @require_POST
@@ -326,7 +316,6 @@ def payment_delete_qr(request):
         payment.qr_image = None
         payment.save()
     return JsonResponse({'success': True})
-
 
 def handler404(request, exception=None):
     return render(request, 'bakery/404.html', status=404)
