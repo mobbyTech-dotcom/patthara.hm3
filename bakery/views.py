@@ -10,11 +10,9 @@ from .forms import ProductForm
 import json
 
 def get_products_json():
-    """Helper ดึงข้อมูลสินค้า, SKU และโปรโมชั่น เป็น JSON"""
     products = Product.objects.filter(is_available=True).prefetch_related('skus', 'promotions')
     data = {}
     for p in products:
-        # เพิ่มการส่ง image_url ของ SKU ไปให้หน้าเว็บด้วย (ถ้ามี)
         skus = []
         for sku in p.skus.all():
             skus.append({
@@ -24,10 +22,11 @@ def get_products_json():
                 'image_url': sku.image.url if sku.image else ''
             })
             
-        promos = list(p.promotions.order_by('-min_quantity').values('min_quantity', 'special_price', 'discount'))
+        promos = list(p.promotions.order_by('-min_quantity').values('min_quantity', 'promo_type', 'special_price', 'discount'))
         
         if not skus:
-            skus = [{'id': f'p_{p.id}', 'name': 'ปกติ', 'price': p.price, 'image_url': ''}]
+            fallback_price = getattr(p, 'price', getattr(p, 'base_price', 0))
+            skus = [{'id': f'p_{p.id}', 'name': 'ปกติ', 'price': fallback_price, 'image_url': ''}]
             
         data[p.id] = {
             'id': p.id,
@@ -138,7 +137,6 @@ def admin_panel(request):
     form     = ProductForm()
     payment  = PaymentInfo.get_singleton()
 
-    # ✅ เพิ่มตัวแปรนับยอด (Pending & Confirmed) สำหรับไปโชว์ในหน้า admin.html
     pending_count = Order.objects.filter(status='pending').count()
     confirmed_count = Order.objects.filter(status='confirmed').count()
     active_orders_count = pending_count + confirmed_count
@@ -153,13 +151,17 @@ def admin_panel(request):
         .values('product_name')
         .annotate(
             total_qty=Sum('quantity'),
-            total_revenue=Sum(
-                ExpressionWrapper(
-                    F('price') * F('quantity'),
-                    output_field=IntField()
-                )
-            )
+            total_revenue=Sum(ExpressionWrapper(F('price') * F('quantity'), output_field=IntField()))
         )
+        .order_by('-total_qty')
+    )
+
+    # ✅ สรุปยอดขนมที่ต้องทำ (จากสถานะ pending และ confirmed)
+    todo_summary_list = list(
+        OrderItem.objects
+        .filter(order__status__in=['pending', 'confirmed'])
+        .values('product_name')
+        .annotate(total_qty=Sum('quantity'))
         .order_by('-total_qty')
     )
 
@@ -174,6 +176,7 @@ def admin_panel(request):
         'sales_total':          sales_total,
         'done_count':           done_count,
         'product_summary':      product_summary_list,
+        'todo_summary':         todo_summary_list,
     })
 
 
@@ -193,11 +196,13 @@ def product_add(request):
                 Promotion.objects.create(
                     product=product, 
                     min_quantity=promo['min_quantity'], 
+                    promo_type=promo.get('promo_type', 'special_price'),
                     special_price=promo.get('special_price') or 0,
-                    discount=promo.get('discount_amount') or 0
+                    discount=promo.get('discount') or 0
                 )
         except Exception as e:
             print("Error saving SKUs/Promos:", e)
+            pass
             
         return JsonResponse({'success': True})
     return JsonResponse({'success': False, 'errors': form.errors})
@@ -223,23 +228,27 @@ def product_edit(request, pk):
                     Promotion.objects.create(
                         product=product, 
                         min_quantity=promo['min_quantity'], 
+                        promo_type=promo.get('promo_type', 'special_price'),
                         special_price=promo.get('special_price') or 0,
-                        discount=promo.get('discount_amount') or 0
+                        discount=promo.get('discount') or 0
                     )
             except Exception as e:
                 print("Error Edit SKU/Promo:", e)
+                pass
 
             return JsonResponse({'success': True})
         return JsonResponse({'success': False, 'errors': form.errors})
     
+    # ✅ ใช้ base_price แทน price ที่ถูกลบไป
+    fallback_price = getattr(product, 'price', getattr(product, 'base_price', 0))
     return JsonResponse({
         'id':          product.id,
         'name':        product.name,
-        'price':       product.price,
+        'price':       fallback_price,
         'description': product.description,
         'image_url':   product.image.url if product.image else '',
-        'skus':        list(product.skus.values('name', 'price')),
-        'promos':      list(product.promotions.values('min_quantity', 'special_price', 'discount')),
+        'skus':        [{'name': s.name, 'price': s.price, 'image_url': s.image.url if s.image else ''} for s in product.skus.all()],
+        'promos':      list(product.promotions.values('min_quantity', 'promo_type', 'special_price', 'discount')),
     })
 
 
@@ -277,7 +286,6 @@ def order_update_status(request, order_id):
     return JsonResponse({'success': False, 'error': 'invalid status'})
 
 
-# ✅ Endpoint ใหม่สำหรับแก้ไขข้อมูลลูกค้าจาก Modal หน้า Admin
 @login_required
 @require_POST
 def order_update_customer(request, order_id):
