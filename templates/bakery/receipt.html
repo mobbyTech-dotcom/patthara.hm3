@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ใบออเดอร์ #{{ order.id }}</title>
+    <title>ใบออเดอร์ #{{ order.order_number }}</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -19,7 +19,6 @@
 </head>
 <body class="min-h-screen flex flex-col items-center justify-start py-8 px-4">
 
-    <!-- ปุ่มบน -->
     <div class="w-full max-w-lg mb-4 flex gap-3 no-print flex-wrap" style="max-width:520px">
         <button onclick="downloadPDF()"
                 class="flex-1 bg-amber-600 hover:bg-amber-700 text-white font-bold py-3 rounded-xl text-sm transition">
@@ -31,12 +30,10 @@
         </button>
     </div>
 
-    <!-- แจ้งเตือน -->
     <div class="bg-amber-50 text-amber-800 rounded-xl px-4 py-3 text-sm text-center mb-4 no-print" style="width:520px;max-width:100%">
         ⚠️ กรุณาดาวน์โหลดใบออเดอร์ก่อนส่งให้ทางร้านนะคะ
     </div>
 
-    <!-- อัปโหลดสลิป -->
     <div class="bg-white rounded-xl px-4 py-4 mb-4 no-print" style="width:520px;max-width:100%">
         <p class="text-sm font-semibold text-gray-700 mb-2">📎 แนบสลิปการชำระเงิน</p>
         {% if order.slip_image %}
@@ -59,26 +56,22 @@
         {% endif %}
     </div>
 
-    <!-- ใบออเดอร์ -->
     <div id="receipt-wrapper" style="width:100%;max-width:100%;overflow-x:auto">
         <div id="receipt" class="rounded-2xl shadow-lg p-6 mx-auto">
 
-            <!-- Header -->
             <div class="text-center border-b pb-4 mb-4">
                 <h1 class="text-2xl font-bold text-amber-800">🧁 ภัทรา Homemade</h1>
                 <p class="text-gray-500 text-sm">ขนมอบสดใหม่ ทำด้วยใจ</p>
-                <p class="text-gray-400 text-xs mt-1">ใบออเดอร์ #{{ order.id }}</p>
+                <p class="text-gray-400 text-xs mt-1">ใบออเดอร์ #{{ order.order_number }}</p>
             </div>
 
-            <!-- สถานะ -->
             <div class="mb-4 flex justify-center">
                 <span class="px-4 py-1.5 rounded-full text-sm font-semibold {{ order.status_color }}">
-                    {% if order.status == 'pending' %}⏳{% elif order.status == 'confirmed' %}✅{% else %}🎉{% endif %}
+                    {% if order.status == 'pending' %}⏳{% elif order.status == 'confirmed' %}✅{% elif order.status == 'done' %}🎉{% else %}❌{% endif %}
                     {{ order.status_label }}
                 </span>
             </div>
 
-            <!-- ข้อมูลลูกค้า -->
             <div class="mb-4 space-y-1.5 text-sm">
                 {% if order.customer_name %}
                 <div class="flex gap-2">
@@ -112,7 +105,6 @@
                 {% endif %}
             </div>
 
-            <!-- รายการสินค้า -->
             <div class="border-t pt-4 mb-4">
                 <h3 class="font-bold text-gray-700 mb-3 text-sm">รายการสินค้า</h3>
                 <table class="w-full text-sm">
@@ -137,13 +129,11 @@
                 </table>
             </div>
 
-            <!-- ยอดรวม -->
             <div class="flex justify-between items-center bg-amber-50 rounded-xl px-4 py-3 mb-4">
                 <span class="font-bold text-gray-700">ยอดรวมทั้งหมด</span>
                 <span class="text-2xl font-bold text-amber-700">฿{{ order.total }}</span>
             </div>
 
-            <!-- ข้อมูลการชำระเงิน -->
             {% if payment.account_number or payment.qr_image %}
             <div class="border-t pt-4">
                 <h3 class="font-bold text-gray-700 mb-3 text-sm text-center">💳 ช่องทางการชำระเงิน</h3>
@@ -163,13 +153,12 @@
                 <div class="text-center">
                     <p class="text-xs text-gray-500 mb-2">สแกน QR Code เพื่อชำระเงิน</p>
                     <img src="{{ payment.qr_image.url }}" alt="QR Code"
-                         style="width:280px;height:280px;object-fit:contain;margin:0 auto;display:block;border:1px solid #e5e7eb;border-radius:12px;padding:8px;">
+                         class="w-full max-w-[240px] h-auto object-contain mx-auto rounded-xl border border-gray-200 p-2 bg-white shadow-sm">
                 </div>
                 {% endif %}
             </div>
             {% endif %}
 
-            <!-- Footer -->
             <div class="text-center mt-5 text-xs text-gray-400">
                 <p>ขอบคุณที่ใช้บริการ ภัทรา Homemade 🧁</p>
                 <p class="mt-1">วันที่สั่ง: {{ order.created_at|date:"d/m/Y H:i" }}</p>
@@ -224,7 +213,7 @@ async function downloadPDF() {
     const pdfWidth = pdf.internal.pageSize.getWidth();
     const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
     pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-    pdf.save('ใบออเดอร์-{{ order.id }}.pdf');
+    pdf.save(`ใบออเดอร์-{{ order.order_number }}.pdf`);
 }
 
 async function downloadImage() {
@@ -234,7 +223,7 @@ async function downloadImage() {
         width: receipt.offsetWidth, windowWidth: receipt.offsetWidth
     });
     const link = document.createElement('a');
-    link.download = 'ใบออเดอร์-{{ order.id }}.png';
+    link.download = `ใบออเดอร์-{{ order.order_number }}.png`;
     link.href = canvas.toDataURL('image/png');
     link.click();
 }
