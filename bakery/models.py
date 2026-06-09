@@ -3,9 +3,8 @@ from cloudinary.models import CloudinaryField
 import random
 import string
 
-
 def generate_order_number():
-    """สร้างเลขออเดอร์สุ่ม 8 หลัก เช่น PT-A3X9K2MQ"""
+    """สร้างเลขออเดอร์สุ่ม 8 หลัก เช่น PT-A3X9K2MQ (เพื่อความเป็นส่วนตัว)"""
     chars = string.ascii_uppercase + string.digits
     suffix = ''.join(random.choices(chars, k=8))
     return f'PT-{suffix}'
@@ -37,6 +36,7 @@ class ProductSKU(models.Model):
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='skus')
     name    = models.CharField(max_length=100, verbose_name='ชื่อตัวเลือก (เช่น รสช็อกโกแลต)')
     price   = models.PositiveIntegerField(verbose_name='ราคา (บาท)')
+    image   = CloudinaryField('image', folder='patthara/skus', blank=True, null=True)
 
     class Meta:
         verbose_name        = 'ตัวเลือกสินค้า (SKU)'
