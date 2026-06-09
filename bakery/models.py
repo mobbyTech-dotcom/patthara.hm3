@@ -4,11 +4,9 @@ import random
 import string
 
 def generate_order_number():
-    """สร้างเลขออเดอร์สุ่ม 8 หลัก เช่น PT-A3X9K2MQ (เพื่อความเป็นส่วนตัว)"""
     chars = string.ascii_uppercase + string.digits
     suffix = ''.join(random.choices(chars, k=8))
     return f'PT-{suffix}'
-
 
 class Product(models.Model):
     name         = models.CharField(max_length=200, verbose_name='ชื่อสินค้า')
@@ -27,10 +25,8 @@ class Product(models.Model):
 
     @property
     def base_price(self):
-        """ราคาต่ำสุดของ SKU ที่มี"""
         sku = self.skus.order_by('price').first()
         return sku.price if sku else 0
-
 
 class ProductSKU(models.Model):
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='skus')
@@ -45,7 +41,6 @@ class ProductSKU(models.Model):
 
     def __str__(self):
         return f"{self.product.name} - {self.name}"
-
 
 class Promotion(models.Model):
     TYPE_SPECIAL_PRICE = 'special_price'
@@ -71,12 +66,13 @@ class Promotion(models.Model):
             return f"ซื้อ {self.min_quantity} ชิ้น เหลือชิ้นละ {self.special_price} บาท"
         return f"ซื้อ {self.min_quantity} ชิ้น ลด {self.discount} บาท"
 
-
 class Order(models.Model):
+    # ✅ เพิ่มสถานะยกเลิก
     STATUS_CHOICES = [
         ('pending',   'รอดำเนินการ'),
         ('confirmed', 'ยืนยันแล้ว'),
         ('done',      'เสร็จสิ้น'),
+        ('cancelled', 'ยกเลิกแล้ว'), 
     ]
     order_number     = models.CharField(max_length=20, unique=True, default=generate_order_number, verbose_name='เลขออเดอร์')
     customer_name    = models.CharField(max_length=200, verbose_name='ชื่อลูกค้า')
@@ -86,6 +82,8 @@ class Order(models.Model):
     note             = models.TextField(blank=True, verbose_name='หมายเหตุ')
     total            = models.PositiveIntegerField(default=0, verbose_name='ยอดรวม')
     status           = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    # ✅ เพิ่มช่องเก็บเหตุผลการยกเลิก
+    cancel_reason    = models.TextField(blank=True, null=True, verbose_name='เหตุผลที่ยกเลิก')
     slip_image       = CloudinaryField('image', folder='patthara/slips', blank=True, null=True)
     created_at       = models.DateTimeField(auto_now_add=True)
 
@@ -107,8 +105,8 @@ class Order(models.Model):
             'pending':   'bg-yellow-100 text-yellow-700',
             'confirmed': 'bg-blue-100 text-blue-700',
             'done':      'bg-green-100 text-green-700',
+            'cancelled': 'bg-red-100 text-red-700',
         }.get(self.status, 'bg-gray-100 text-gray-500')
-
 
 class OrderItem(models.Model):
     order        = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='items')
@@ -122,7 +120,6 @@ class OrderItem(models.Model):
 
     def __str__(self):
         return f'{self.product_name} x{self.quantity}'
-
 
 class PaymentInfo(models.Model):
     bank_name      = models.CharField(max_length=100, verbose_name='ชื่อธนาคาร', blank=True)
