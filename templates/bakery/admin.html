@@ -110,8 +110,13 @@
                     class="filter-btn px-4 py-1.5 rounded-full text-sm font-semibold transition bg-gray-100 text-gray-600">
                 🎉 เสร็จสิ้น
             </button>
+            
+            <button onclick="openTodoSummary()"
+                    class="ml-auto px-4 py-1.5 rounded-full text-sm font-semibold transition bg-blue-600 text-white hover:bg-blue-700 flex items-center gap-1.5 mr-2">
+                📋 ยอดต้องทำ
+            </button>
             <button onclick="openSalesSummary()"
-                    class="ml-auto px-4 py-1.5 rounded-full text-sm font-semibold transition bg-amber-600 text-white hover:bg-amber-700 flex items-center gap-1.5">
+                    class="px-4 py-1.5 rounded-full text-sm font-semibold transition bg-amber-600 text-white hover:bg-amber-700 flex items-center gap-1.5">
                 📊 สรุปยอดขาย
             </button>
         </div>
@@ -264,6 +269,41 @@
     </div>
 </div>
 
+<div id="todo-modal" class="hidden fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto">
+        <div class="flex items-center justify-between mb-5">
+            <div>
+                <h2 class="text-lg font-bold text-gray-800">📋 สรุปยอดขนมที่ต้องทำ</h2>
+                <p class="text-xs text-gray-400 mt-0.5">รวมจากสถานะ <span class="text-yellow-600 font-semibold">รอดำเนินการ</span> และ <span class="text-blue-600 font-semibold">ยืนยันแล้ว</span></p>
+            </div>
+            <button onclick="closeTodoSummary()" class="text-gray-400 hover:text-gray-600 text-xl font-bold leading-none">✕</button>
+        </div>
+        
+        {% if todo_summary %}
+        <div class="space-y-2">
+            {% for item in todo_summary %}
+            <div class="flex items-center justify-between bg-amber-50 border border-amber-100 rounded-xl px-4 py-3">
+                <div class="flex items-center gap-2">
+                    <span class="text-base">🧁</span><span class="text-sm font-bold text-gray-800">{{ item.product_name }}</span>
+                </div>
+                <div class="text-right">
+                    <span class="text-lg font-extrabold text-amber-700">{{ item.total_qty }}</span>
+                    <span class="text-xs text-amber-600 font-semibold ml-1">ชิ้น</span>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center py-8 text-gray-400">
+            <p class="text-3xl mb-2">🙌</p>
+            <p class="text-sm">ไม่มีออเดอร์ค้างทำ</p>
+        </div>
+        {% endif %}
+        
+        <button onclick="closeTodoSummary()" class="mt-5 w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-2.5 rounded-xl text-sm transition">ปิด</button>
+    </div>
+</div>
+
 <div id="modal" class="hidden fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4">
     <div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 max-h-[95vh] flex flex-col">
         <h2 id="modal-title" class="text-lg font-bold text-gray-800 mb-4 shrink-0">เพิ่มสินค้า</h2>
@@ -350,6 +390,10 @@ const csrfToken = '{{ csrf_token }}';
 function openSalesSummary() { document.getElementById('sales-modal').classList.remove('hidden'); }
 function closeSalesSummary() { document.getElementById('sales-modal').classList.add('hidden'); }
 
+/* ─── Todo Summary ─── */
+function openTodoSummary() { document.getElementById('todo-modal').classList.remove('hidden'); }
+function closeTodoSummary() { document.getElementById('todo-modal').classList.add('hidden'); }
+
 /* ─── Tabs & Filters ─── */
 function switchTab(name) {
     ['products','orders','payment'].forEach(t => {
@@ -432,7 +476,6 @@ function addSkuRow(name = '', price = '', imageUrl = '') {
     const row = document.createElement('div');
     row.className = 'flex gap-2 sku-row items-center';
     
-    // แสดงรูป SKU (ถ้ามีข้อมูลจากหลังบ้าน)
     let imgHtml = '';
     if (imageUrl) {
         imgHtml = `<img src="${imageUrl}" class="w-8 h-8 rounded object-cover border">`;
@@ -571,7 +614,7 @@ async function editProduct(id) {
 
     document.getElementById('skus-container').innerHTML = '';
     if(data.skus && data.skus.length > 0) {
-        data.skus.forEach(s => addSkuRow(s.name, s.price, s.image_url)); // โชว์รูป SKU ถ้ามี
+        data.skus.forEach(s => addSkuRow(s.name, s.price, s.image_url));
     } else {
         addSkuRow('ปกติ', data.price, '');
     }
