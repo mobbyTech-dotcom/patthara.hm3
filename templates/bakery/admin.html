@@ -752,22 +752,64 @@ function previewNewQR(event) {
         reader.readAsDataURL(file);
     }
 }
+// เอาไปวางทับ savePayment และ deleteQR อันเก่าด้านล่างสุดของ admin.html นะครับ
+
 async function savePayment() {
-    const formData = new FormData();
-    formData.append('bank_name', document.getElementById('pay-bank').value.trim());
-    formData.append('account_number', document.getElementById('pay-account').value.trim());
-    formData.append('account_name', document.getElementById('pay-name').value.trim());
-    const qrFile = document.getElementById('pay-qr-file').files[0];
-    if (qrFile) formData.append('qr_image', qrFile);
-    const res = await fetch('/admin-panel/payment/update/', { method: 'POST', headers: { 'X-CSRFToken': csrfToken }, body: formData });
-    const data = await res.json();
-    if (data.success) {
-        const msg = document.getElementById('pay-msg');
-        msg.classList.remove('hidden');
-        setTimeout(() => msg.classList.add('hidden'), 3000);
-        if (qrFile) location.reload();
+    try {
+        const formData = new FormData();
+        formData.append('bank_name', document.getElementById('pay-bank').value.trim());
+        formData.append('account_number', document.getElementById('pay-account').value.trim());
+        formData.append('account_name', document.getElementById('pay-name').value.trim());
+        const qrFile = document.getElementById('pay-qr-file').files[0];
+        if (qrFile) formData.append('qr_image', qrFile);
+
+        const res = await fetch('/admin-panel/payment/update/', { 
+            method: 'POST', 
+            headers: { 'X-CSRFToken': csrfToken }, 
+            body: formData 
+        });
+
+        if (!res.ok) {
+            alert(`ไม่สามารถบันทึกได้ ระบบหลังบ้านแจ้ง Error รหัส: ${res.status}`);
+            return;
+        }
+
+        const data = await res.json();
+        if (data.success) {
+            const msg = document.getElementById('pay-msg');
+            msg.classList.remove('hidden');
+            setTimeout(() => msg.classList.add('hidden'), 3000);
+            if (qrFile) location.reload();
+        }
+    } catch (error) {
+        alert("เกิดข้อผิดพลาดทางระบบ (JS): " + error.message);
     }
 }
+
+async function deleteQR() {
+    if (!confirm('ลบ QR Code นี้?')) return;
+    try {
+        const res = await fetch('/admin-panel/payment/delete-qr/', { 
+            method: 'POST', 
+            headers: { 'X-CSRFToken': csrfToken } 
+        });
+
+        if (!res.ok) {
+            alert(`ไม่สามารถลบได้ ระบบหลังบ้านแจ้ง Error รหัส: ${res.status}`);
+            return;
+        }
+
+        const data = await res.json();
+        if (data.success) {
+            document.getElementById('qr-preview-wrap').classList.add('hidden');
+            document.getElementById('qr-preview-img').src = '';
+            alert('ลบรูปภาพ QR สำเร็จเรียบร้อยแล้วครับ');
+        }
+    } catch (error) {
+        alert("เกิดข้อผิดพลาดทางระบบ (JS): " + error.message);
+    }
+}
+    
 async function deleteQR() {
     if (!confirm('ลบ QR Code นี้?')) return;
     const res = await fetch('/admin-panel/payment/delete-qr/', { method: 'POST', headers: { 'X-CSRFToken': csrfToken } });
