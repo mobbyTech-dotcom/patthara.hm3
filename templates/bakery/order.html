@@ -20,18 +20,24 @@
     <div class="bg-white rounded-2xl shadow-sm p-5 mb-6">
         <h2 class="font-bold text-gray-700 mb-4 text-lg">📋 ข้อมูลการสั่งซื้อ</h2>
         <div class="space-y-3">
-            <input type="text" id="customer_name" placeholder="ชื่อ-นามสกุล *" class="w-full border rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-amber-400 focus:outline-none">
-            <input type="tel" id="phone" placeholder="เบอร์โทรศัพท์ *" class="w-full border rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-amber-400 focus:outline-none">
-            <textarea id="address" placeholder="ที่อยู่ *" rows="3" class="w-full border rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-amber-400 focus:outline-none"></textarea>
+            <input type="text" id="customer_name" placeholder="ชื่อ-นามสกุล *"
+                   class="w-full border rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-amber-400 focus:outline-none">
+            <input type="tel" id="phone" placeholder="เบอร์โทรศัพท์ *"
+                   class="w-full border rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-amber-400 focus:outline-none">
+            <textarea id="address" placeholder="ที่อยู่ *" rows="3"
+                      class="w-full border rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-amber-400 focus:outline-none"></textarea>
             <div>
                 <label class="block text-xs text-gray-500 mb-1">วันนัดรับ *</label>
-                <input type="date" id="appointment_date" class="w-full border rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-amber-400 focus:outline-none">
+                <input type="date" id="appointment_date"
+                       class="w-full border rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-amber-400 focus:outline-none">
             </div>
-            <textarea id="note" placeholder="หมายเหตุเพิ่มเติม (ไม่บังคับ)" rows="2" class="w-full border rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-amber-400 focus:outline-none"></textarea>
+            <textarea id="note" placeholder="หมายเหตุเพิ่มเติม (ไม่บังคับ)" rows="2"
+                      class="w-full border rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-amber-400 focus:outline-none"></textarea>
         </div>
     </div>
 
-    <button onclick="submitOrder()" class="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold py-4 rounded-2xl text-lg transition shadow-md">
+    <button onclick="submitOrder()"
+            class="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold py-4 rounded-2xl text-lg transition shadow-md">
         📄 ยืนยันและดูใบออเดอร์
     </button>
 </div>
@@ -42,8 +48,8 @@ let cart = {};
 try { cart = JSON.parse(sessionStorage.getItem('patthara_cart') || '{}'); } catch(e) {}
 
 function calculateCart() {
-    let productCounts = {};
-    // นับจำนวนรวมของสินค้าแต่ละชนิด (รวมทุก SKU)
+    // นับจำนวนรวมต่อสินค้า (รวมทุก SKU) เพื่อตรวจโปร
+    const productCounts = {};
     Object.values(cart).forEach(item => {
         if (item.qty > 0) {
             productCounts[item.productId] = (productCounts[item.productId] || 0) + item.qty;
@@ -51,52 +57,38 @@ function calculateCart() {
     });
 
     let total = 0;
-    let finalItems = [];
+    const finalItems = [];
 
     Object.entries(cart).forEach(([skuId, item]) => {
         if (item.qty <= 0) return;
-        
-        let currentPrice = item.price;
-        const pData = productsData[item.productId];
-        let hasDiscount = false;
 
-        // ตรวจสอบโปรโมชั่น
+        let currentPrice = item.price;
+        let hasDiscount  = false;
+        const pData      = productsData[item.productId];
+
+        // ตรวจโปรโมชั่น
         if (pData && pData.promos && pData.promos.length > 0) {
             const totalQty = productCounts[item.productId];
-            for (let promo of pData.promos) {
+            for (const promo of pData.promos) {
                 if (totalQty >= promo.min_quantity) {
                     currentPrice = promo.special_price;
-                    hasDiscount = true; break;
+                    hasDiscount  = true;
+                    break;
                 }
             }
         }
-        
+
         total += currentPrice * item.qty;
         finalItems.push({
-            skuId: skuId,
-            productId: item.productId,
-            name: `${pData.name} (${item.skuName})`,
-            price: currentPrice,
-            qty: item.qty,
+            skuId,
+            productId:     item.productId,
+            name:          `${pData ? pData.name : ''} (${item.skuName})`,
+            price:         currentPrice,
+            qty:           item.qty,
             originalPrice: item.price,
-            hasDiscount: hasDiscount
+            hasDiscount,
         });
     });
-// ในฟังก์ชัน calculateCart ของ order.html
-if (pData && pData.promos && pData.promos.length > 0) {
-    const totalQty = productCounts[item.productId];
-    for (let promo of pData.promos) {
-        if (totalQty >= promo.min_quantity) {
-            if (promo.special_price > 0) {
-                currentPrice = promo.special_price;
-            } else if (promo.discount_amount > 0) {
-                total -= promo.discount_amount;
-                hasDiscount = true;
-            }
-            break;
-        }
-    }
-}
 
     return { total, finalItems };
 }
@@ -104,20 +96,18 @@ if (pData && pData.promos && pData.promos.length > 0) {
 function renderCart() {
     const { total, finalItems } = calculateCart();
     const container = document.getElementById('cart-container');
-    const itemsDiv = document.getElementById('dynamic-cart-items');
-    
-    if (finalItems.length === 0) {
-        container.classList.add('hidden');
-        return;
-    }
-    
+    const itemsDiv  = document.getElementById('dynamic-cart-items');
+
+    if (finalItems.length === 0) { container.classList.add('hidden'); return; }
     container.classList.remove('hidden');
     document.getElementById('cart-total').textContent = '฿' + total.toLocaleString();
 
     itemsDiv.innerHTML = finalItems.map(item => {
-        const pData = productsData[item.productId];
-        const imgHtml = pData && pData.image ? `<img src="${pData.image}" class="w-14 h-14 object-cover rounded-lg flex-shrink-0">` : `<div class="w-14 h-14 bg-amber-100 rounded-lg flex items-center justify-center text-2xl flex-shrink-0">🧁</div>`;
-        const priceHtml = item.hasDiscount 
+        const pData   = productsData[item.productId];
+        const imgHtml = pData && pData.image
+            ? `<img src="${pData.image}" class="w-14 h-14 object-cover rounded-lg flex-shrink-0">`
+            : `<div class="w-14 h-14 bg-amber-100 rounded-lg flex items-center justify-center text-2xl flex-shrink-0">🧁</div>`;
+        const priceHtml = item.hasDiscount
             ? `<span class="line-through text-gray-400 text-xs mr-1">฿${item.originalPrice}</span><span class="text-green-600 font-bold">฿${item.price}</span> <span class="text-xs text-green-600 bg-green-100 px-1.5 py-0.5 rounded ml-1">ราคาโปร!</span>`
             : `<span class="text-amber-700 font-bold">฿${item.price}</span>`;
 
@@ -129,9 +119,11 @@ function renderCart() {
                 <div class="text-sm mt-1">${priceHtml}</div>
             </div>
             <div class="flex items-center gap-2">
-                <button onclick="changeQty('${item.skuId}', -1)" class="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 font-bold text-lg flex items-center justify-center">−</button>
+                <button onclick="changeQty('${item.skuId}', -1)"
+                        class="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 font-bold text-lg flex items-center justify-center">−</button>
                 <span class="w-6 text-center font-bold text-gray-800">${item.qty}</span>
-                <button onclick="changeQty('${item.skuId}', 1)" class="w-8 h-8 rounded-full bg-amber-500 hover:bg-amber-600 text-white font-bold text-lg flex items-center justify-center">+</button>
+                <button onclick="changeQty('${item.skuId}', 1)"
+                        class="w-8 h-8 rounded-full bg-amber-500 hover:bg-amber-600 text-white font-bold text-lg flex items-center justify-center">+</button>
             </div>
         </div>`;
     }).join('');
@@ -150,15 +142,16 @@ async function submitOrder() {
     const { total, finalItems } = calculateCart();
     if (finalItems.length === 0) return alert('กรุณาเลือกสินค้าก่อนยืนยันออเดอร์');
 
-    const items = finalItems.map(i => ({ name: i.name, price: i.price, quantity: i.qty }));
-
-    const name = document.getElementById('customer_name').value.trim();
-    const phone = document.getElementById('phone').value.trim();
+    const name    = document.getElementById('customer_name').value.trim();
+    const phone   = document.getElementById('phone').value.trim();
     const address = document.getElementById('address').value.trim();
-    const date = document.getElementById('appointment_date').value;
-    const note = document.getElementById('note').value.trim();
+    const date    = document.getElementById('appointment_date').value;
+    const note    = document.getElementById('note').value.trim();
 
-    if (!name || !phone || !address || !date) return alert('กรุณากรอกข้อมูลให้ครบ (ชื่อ, เบอร์โทร, ที่อยู่, วันนัดรับ)');
+    if (!name || !phone || !address || !date)
+        return alert('กรุณากรอกข้อมูลให้ครบ (ชื่อ, เบอร์โทร, ที่อยู่, วันนัดรับ)');
+
+    const items = finalItems.map(i => ({ name: i.name, price: i.price, quantity: i.qty }));
 
     const res = await fetch('/order/create/', {
         method: 'POST',
