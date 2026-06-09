@@ -16,7 +16,7 @@ def get_products_json():
     data = {}
     for p in products:
         skus = list(p.skus.values('id', 'name', 'price'))
-        promos = list(p.promotions.order_by('-min_quantity').values('min_quantity', 'special_price'))
+        promos = list(p.promotions.order_by('-min_quantity').values('min_quantity', 'promo_type', 'special_price', 'discount'))
         # ถ้าร้านยังไม่ได้ตั้ง SKU ให้ใช้สินค้าหลักเป็น 1 SKU อัตโนมัติ (กันระบบพัง)
         if not skus:
             skus = [{'id': f'p_{p.id}', 'name': 'ปกติ', 'price': 0}]
@@ -177,7 +177,14 @@ def product_add(request):
             for sku in skus:
                 ProductSKU.objects.create(product=product, name=sku['name'], price=sku['price'])
             for promo in promos:
-                Promotion.objects.create(product=product, min_quantity=promo['min_quantity'], special_price=promo['special_price'])
+                ptype = promo.get('promo_type', 'special_price')
+                Promotion.objects.create(
+                    product=product,
+                    min_quantity=promo['min_quantity'],
+                    promo_type=ptype,
+                    special_price=promo.get('special_price') or None,
+                    discount=promo.get('discount') or None,
+                )
         except Exception as e:
             print("Error saving SKUs/Promos:", e)
             pass
@@ -205,7 +212,14 @@ def product_edit(request, pk):
                 for sku in skus:
                     ProductSKU.objects.create(product=product, name=sku['name'], price=sku['price'])
                 for promo in promos:
-                    Promotion.objects.create(product=product, min_quantity=promo['min_quantity'], special_price=promo['special_price'])
+                    ptype = promo.get('promo_type', 'special_price')
+                    Promotion.objects.create(
+                        product=product,
+                        min_quantity=promo['min_quantity'],
+                        promo_type=ptype,
+                        special_price=promo.get('special_price') or None,
+                        discount=promo.get('discount') or None,
+                    )
             except Exception as e:
                 # ปริ้นท์ Error เผื่อไว้ดูในหน้า Logs ของ Render
                 print("Error Edit SKU/Promo:", e)
@@ -221,7 +235,7 @@ def product_edit(request, pk):
         'description': product.description,
         'image_url':   product.image.url if product.image else '',
         'skus':        list(product.skus.values('name', 'price')),
-        'promos':      list(product.promotions.values('min_quantity', 'special_price')),
+        'promos':      list(product.promotions.values('min_quantity', 'promo_type', 'special_price', 'discount')),
     })
 
 

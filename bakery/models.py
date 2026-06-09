@@ -48,9 +48,18 @@ class ProductSKU(models.Model):
 
 
 class Promotion(models.Model):
+    TYPE_SPECIAL_PRICE = 'special_price'
+    TYPE_DISCOUNT      = 'discount'
+    TYPE_CHOICES = [
+        (TYPE_SPECIAL_PRICE, 'ราคาพิเศษต่อชิ้น'),
+        (TYPE_DISCOUNT,      'ส่วนลดรวม (บาท)'),
+    ]
+
     product       = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='promotions')
     min_quantity  = models.PositiveIntegerField(verbose_name='ซื้อครบ (ชิ้น)')
-    special_price = models.PositiveIntegerField(verbose_name='ราคาพิเศษต่อชิ้น (บาท)')
+    promo_type    = models.CharField(max_length=20, choices=TYPE_CHOICES, default=TYPE_SPECIAL_PRICE, verbose_name='ประเภทโปร')
+    special_price = models.PositiveIntegerField(null=True, blank=True, verbose_name='ราคาพิเศษต่อชิ้น (บาท)')
+    discount      = models.PositiveIntegerField(null=True, blank=True, verbose_name='ส่วนลดรวม (บาท)')
 
     class Meta:
         verbose_name        = 'โปรโมชั่น'
@@ -58,7 +67,9 @@ class Promotion(models.Model):
         ordering            = ['-min_quantity']
 
     def __str__(self):
-        return f"ซื้อ {self.min_quantity} ชิ้น เหลือชิ้นละ {self.special_price} บาท"
+        if self.promo_type == self.TYPE_SPECIAL_PRICE:
+            return f"ซื้อ {self.min_quantity} ชิ้น เหลือชิ้นละ {self.special_price} บาท"
+        return f"ซื้อ {self.min_quantity} ชิ้น ลด {self.discount} บาท"
 
 
 class Order(models.Model):
