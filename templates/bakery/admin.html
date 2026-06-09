@@ -110,6 +110,10 @@
                     class="filter-btn px-4 py-1.5 rounded-full text-sm font-semibold transition bg-gray-100 text-gray-600">
                 🎉 เสร็จสิ้น
             </button>
+            <button onclick="filterOrders('cancelled')" id="filter-cancelled"
+                    class="filter-btn px-4 py-1.5 rounded-full text-sm font-semibold transition bg-gray-100 text-gray-600">
+                ❌ ยกเลิก
+            </button>
             
             <button onclick="openTodoSummary()"
                     class="ml-auto px-4 py-1.5 rounded-full text-sm font-semibold transition bg-blue-600 text-white hover:bg-blue-700 flex items-center gap-1.5 mr-2">
@@ -129,10 +133,17 @@
                         <span class="font-bold text-gray-700">#{{ order.order_number }}</span>
                         <span class="text-sm text-gray-500">{{ order.customer_name }}</span>
                         <span class="text-xs text-gray-400">{{ order.created_at|date:"d/m/Y H:i" }}</span>
+                        
+                        {% if order.status != 'cancelled' %}
                         <button onclick="openEditOrderModal({{ order.id }}, '{{ order.customer_name|escapejs }}', '{{ order.phone|escapejs }}', '{{ order.address|escapejs }}', '{{ order.appointment_date|date:'Y-m-d' }}', '{{ order.note|escapejs }}')" 
                                 class="text-xs bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full hover:bg-blue-200 transition ml-2">
                             ✏️ แก้ไขข้อมูล
                         </button>
+                        <button onclick="openCancelModal({{ order.id }})" 
+                                class="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full hover:bg-red-200 transition ml-1">
+                            ❌ ยกเลิกออเดอร์
+                        </button>
+                        {% endif %}
                     </div>
                     <div class="flex items-center gap-2">
                         <select onchange="updateOrderStatus({{ order.id }}, this.value)"
@@ -140,10 +151,12 @@
                                 class="text-xs border rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-400
                                 {% if order.status == 'pending' %}bg-yellow-50 text-yellow-700 border-yellow-200
                                 {% elif order.status == 'confirmed' %}bg-blue-50 text-blue-700 border-blue-200
-                                {% else %}bg-green-50 text-green-700 border-green-200{% endif %}">
+                                {% elif order.status == 'done' %}bg-green-50 text-green-700 border-green-200
+                                {% else %}bg-red-50 text-red-700 border-red-200{% endif %}">
                             <option value="pending"   {% if order.status == 'pending' %}selected{% endif %}>⏳ รอดำเนินการ</option>
                             <option value="confirmed" {% if order.status == 'confirmed' %}selected{% endif %}>✅ ยืนยันแล้ว</option>
                             <option value="done"      {% if order.status == 'done' %}selected{% endif %}>🎉 เสร็จสิ้น</option>
+                            <option value="cancelled" {% if order.status == 'cancelled' %}selected{% endif %}>❌ ยกเลิกแล้ว</option>
                         </select>
                     </div>
                 </div>
@@ -173,6 +186,15 @@
                         {% endif %}
                     </div>
                 </div>
+
+                {% if order.status == 'cancelled' and order.cancel_reason %}
+                <div class="px-5 pb-3">
+                    <div class="bg-red-50 text-red-600 p-2.5 rounded-xl text-sm border border-red-100 flex items-start gap-2">
+                        <span class="text-red-500 font-bold">⚠️ เหตุผลที่ยกเลิก:</span> 
+                        <span>{{ order.cancel_reason }}</span>
+                    </div>
+                </div>
+                {% endif %}
             </div>
             {% empty %}
             <div class="text-center py-20 text-gray-400">
@@ -333,7 +355,6 @@
                     <button type="button" onclick="addSkuRow()" class="text-xs bg-amber-100 text-amber-700 px-2 py-1.5 rounded hover:bg-amber-200 font-semibold">+ เพิ่มตัวเลือก</button>
                 </div>
                 <div id="skus-container" class="space-y-2"></div>
-                <p class="text-xs text-gray-400 mt-2">* หากต้องการเพิ่ม/เปลี่ยนรูปภาพ SKU กรุณาจัดการที่ระบบหลังบ้านของ Django (<code>/admin/</code>)</p>
             </div>
 
             <hr class="my-4 border-gray-100">
@@ -372,6 +393,19 @@
     </div>
 </div>
 
+<div id="cancel-modal" class="hidden fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6">
+        <h2 class="text-lg font-bold text-red-600 mb-2">❌ ยกเลิกออเดอร์</h2>
+        <p class="text-sm text-gray-500 mb-4">คุณต้องการยกเลิกออเดอร์นี้ใช่หรือไม่? กรุณาระบุเหตุผล</p>
+        <input type="hidden" id="cancel-order-id">
+        <textarea id="cancel-reason" rows="3" class="w-full border rounded-xl px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-red-400 focus:outline-none" placeholder="ระบุเหตุผลที่ยกเลิก... (บังคับ)"></textarea>
+        <div class="flex gap-3 pt-4 mt-2 border-t">
+            <button onclick="confirmCancelOrder()" class="flex-1 bg-red-500 hover:bg-red-600 text-white font-semibold py-2.5 rounded-xl text-sm transition shadow-md">ยืนยัน</button>
+            <button onclick="closeCancelModal()" class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-2.5 rounded-xl text-sm transition">ปิด</button>
+        </div>
+    </div>
+</div>
+
 <div id="slip-modal" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center z-50 px-4" onclick="closeSlipModal()">
     <img id="slip-modal-img" class="max-w-full max-h-full rounded-xl shadow-2xl" onclick="event.stopPropagation()">
 </div>
@@ -386,15 +420,11 @@
 <script>
 const csrfToken = '{{ csrf_token }}';
 
-/* ─── Sales Summary ─── */
 function openSalesSummary() { document.getElementById('sales-modal').classList.remove('hidden'); }
 function closeSalesSummary() { document.getElementById('sales-modal').classList.add('hidden'); }
-
-/* ─── Todo Summary ─── */
 function openTodoSummary() { document.getElementById('todo-modal').classList.remove('hidden'); }
 function closeTodoSummary() { document.getElementById('todo-modal').classList.add('hidden'); }
 
-/* ─── Tabs & Filters ─── */
 function switchTab(name) {
     ['products','orders','payment'].forEach(t => {
         document.getElementById('panel-' + t).classList.toggle('hidden', t !== name);
@@ -409,8 +439,15 @@ function filterOrders(status) {
     });
 }
 
-/* ─── Order Status Update ─── */
 async function updateOrderStatus(orderId, status) {
+    // ✅ ดักจับถ้าเลือก 'ยกเลิกแล้ว' จาก Dropdown ให้เปิด Modal พิมพ์เหตุผล
+    if (status === 'cancelled') {
+        openCancelModal(orderId);
+        const sel = document.getElementById('status-select-' + orderId);
+        sel.value = document.getElementById('order-card-' + orderId).dataset.status; 
+        return;
+    }
+
     const formData = new FormData();
     formData.append('status', status);
     const res = await fetch(`/admin-panel/order/${orderId}/status/`, { method: 'POST', headers: { 'X-CSRFToken': csrfToken }, body: formData });
@@ -423,12 +460,44 @@ async function updateOrderStatus(orderId, status) {
             pending:   'bg-yellow-50 text-yellow-700 border-yellow-200',
             confirmed: 'bg-blue-50 text-blue-700 border-blue-200',
             done:      'bg-green-50 text-green-700 border-green-200',
+            cancelled: 'bg-red-50 text-red-700 border-red-200',
         };
         sel.classList.add(...colorMap[status].split(' '));
     }
 }
 
-/* ─── Edit Order Modal ─── */
+/* ─── Cancel Order Modal ─── */
+function openCancelModal(id) {
+    document.getElementById('cancel-order-id').value = id;
+    document.getElementById('cancel-reason').value = '';
+    document.getElementById('cancel-modal').classList.remove('hidden');
+}
+
+function closeCancelModal() {
+    document.getElementById('cancel-modal').classList.add('hidden');
+}
+
+async function confirmCancelOrder() {
+    const id = document.getElementById('cancel-order-id').value;
+    const reason = document.getElementById('cancel-reason').value.trim();
+    if (!reason) return alert('กรุณาระบุเหตุผลที่ยกเลิกออเดอร์ (เช่น ลูกค้าไม่โอนเงิน, ของหมด)');
+    
+    const formData = new FormData();
+    formData.append('cancel_reason', reason);
+
+    const res = await fetch(`/admin-panel/order/${id}/cancel/`, { 
+        method: 'POST', 
+        headers: { 'X-CSRFToken': csrfToken }, 
+        body: formData 
+    });
+    const data = await res.json();
+    if (data.success) {
+        location.reload(); 
+    } else {
+        alert('เกิดข้อผิดพลาดในการยกเลิกออเดอร์');
+    }
+}
+
 function openEditOrderModal(id, name, phone, address, date, note) {
     document.getElementById('edit-order-id').value = id;
     document.getElementById('edit-order-name').value = name;
@@ -465,31 +534,51 @@ async function saveEditOrder() {
     }
 }
 
-/* ─── Slip Modal ─── */
 function openSlipModal(url) { document.getElementById('slip-modal-img').src = url; document.getElementById('slip-modal').classList.remove('hidden'); }
 function closeSlipModal() { document.getElementById('slip-modal').classList.add('hidden'); }
 
-
-/* ─── Product Modal (รวมระบบ SKU และ Promotion) ─── */
-function addSkuRow(name = '', price = '', imageUrl = '') {
+function addSkuRow(id = '', name = '', price = '', imageUrl = '') {
     const container = document.getElementById('skus-container');
     const row = document.createElement('div');
     row.className = 'flex gap-2 sku-row items-center';
-    
+    row.dataset.id = id; 
+
     let imgHtml = '';
     if (imageUrl) {
-        imgHtml = `<img src="${imageUrl}" class="w-8 h-8 rounded object-cover border">`;
+        imgHtml = `<img src="${imageUrl}" class="w-9 h-9 rounded object-cover border sku-preview">`;
     } else {
-        imgHtml = `<div class="w-8 h-8 rounded bg-gray-100 border flex items-center justify-center text-[10px] text-gray-400">รูป</div>`;
+        imgHtml = `<div class="w-9 h-9 rounded bg-amber-50 border border-amber-200 flex items-center justify-center text-[10px] text-amber-600 font-bold sku-preview hover:bg-amber-100 transition shadow-sm">รูป</div>`;
     }
 
     row.innerHTML = `
-        ${imgHtml}
+        <label class="cursor-pointer shrink-0" title="คลิกเพื่ออัปโหลดรูป SKU">
+            ${imgHtml}
+            <input type="file" accept="image/*" class="hidden sku-image-input" onchange="previewSkuImage(event, this)">
+        </label>
         <input type="text" placeholder="เช่น รสช็อกโกแลต" value="${name}" class="sku-name flex-1 border rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-amber-400 focus:outline-none">
         <input type="number" placeholder="ราคา" value="${price}" class="sku-price w-24 border rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-amber-400 focus:outline-none">
         <button onclick="this.parentElement.remove()" class="text-red-400 hover:text-red-600 font-bold px-1 text-xl leading-none">×</button>
     `;
     container.appendChild(row);
+}
+
+function previewSkuImage(event, inputEl) {
+    const file = event.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = e => {
+            const previewEl = inputEl.parentElement.querySelector('.sku-preview');
+            if (previewEl.tagName === 'IMG') {
+                previewEl.src = e.target.result;
+            } else {
+                const img = document.createElement('img');
+                img.src = e.target.result;
+                img.className = 'w-9 h-9 rounded object-cover border sku-preview shadow-sm';
+                inputEl.parentElement.replaceChild(img, previewEl);
+            }
+        };
+        reader.readAsDataURL(file);
+    }
 }
 
 function addPromoRow(qty = '', promoType = 'special_price', price = '', discount = '') {
@@ -502,18 +591,14 @@ function addPromoRow(qty = '', promoType = 'special_price', price = '', discount
 
     row.innerHTML = `
         <span class="text-xs text-gray-500 whitespace-nowrap">ซื้อครบ</span>
-        <input type="number" placeholder="ชิ้น" value="${qty}" min="1"
-               class="promo-qty w-14 border rounded px-1 text-center text-sm">
+        <input type="number" placeholder="ชิ้น" value="${qty}" min="1" class="promo-qty w-14 border rounded px-1 text-center text-sm">
         <span class="text-xs text-gray-500">ชิ้น</span>
-        <select class="promo-type border rounded px-1 text-xs text-gray-700 bg-white"
-                onchange="togglePromoInputs(this)">
+        <select class="promo-type border rounded px-1 text-xs text-gray-700 bg-white" onchange="togglePromoInputs(this)">
             <option value="special_price" ${promoType==='special_price'?'selected':''}>ราคาพิเศษ/ชิ้น</option>
             <option value="discount"      ${promoType==='discount'     ?'selected':''}>ส่วนลดรวม (฿)</option>
         </select>
-        <input type="number" placeholder="ราคา/ชิ้น (฿)" value="${price}" min="0"
-               class="promo-price w-24 border rounded px-1 text-center text-sm ${priceDisplay}">
-        <input type="number" placeholder="ลด (฿)" value="${discount}" min="0"
-               class="promo-discount w-24 border rounded px-1 text-center text-sm ${discountDisplay}">
+        <input type="number" placeholder="ราคา/ชิ้น (฿)" value="${price}" min="0" class="promo-price w-24 border rounded px-1 text-center text-sm ${priceDisplay}">
+        <input type="number" placeholder="ลด (฿)" value="${discount}" min="0" class="promo-discount w-24 border rounded px-1 text-center text-sm ${discountDisplay}">
         <button onclick="this.closest('.promo-row').remove()" class="text-red-400 font-bold ml-auto px-2 text-lg leading-none">×</button>
     `;
     container.appendChild(row);
@@ -537,11 +622,8 @@ function togglePromoInputs(selectEl) {
 function openModal(title = 'เพิ่มสินค้า') {
     document.getElementById('modal-title').textContent = title;
     document.getElementById('modal').classList.remove('hidden');
-    
     if(title === 'เพิ่มสินค้า') {
-        if(document.getElementById('skus-container').children.length === 0) {
-            addSkuRow('ปกติ', '');
-        }
+        if(document.getElementById('skus-container').children.length === 0) { addSkuRow('', 'ปกติ', '', ''); }
     }
 }
 
@@ -550,7 +632,6 @@ function closeModal() {
     ['prod-id','prod-name','prod-price','prod-desc'].forEach(id => document.getElementById(id).value = '');
     document.getElementById('prod-img-file').value = '';
     document.getElementById('img-preview-wrap').classList.add('hidden');
-    
     document.getElementById('skus-container').innerHTML = '';
     document.getElementById('promos-container').innerHTML = '';
 }
@@ -576,10 +657,20 @@ async function saveProduct() {
     const imgFile = document.getElementById('prod-img-file').files[0];
     if (imgFile) formData.append('image', imgFile);
 
-    const skus = Array.from(document.querySelectorAll('.sku-row')).map(row => ({
-        name: row.querySelector('.sku-name').value.trim(),
-        price: row.querySelector('.sku-price').value
-    })).filter(s => s.name && s.price); 
+    const skus = [];
+    Array.from(document.querySelectorAll('.sku-row')).forEach((row, index) => {
+        const name = row.querySelector('.sku-name').value.trim();
+        const price = row.querySelector('.sku-price').value;
+        const skuId = row.dataset.id;
+        
+        if (name && price) {
+            skus.push({ id: skuId, name: name, price: price, originalIndex: index });
+            const fileInput = row.querySelector('.sku-image-input');
+            if (fileInput && fileInput.files.length > 0) {
+                formData.append(`sku_image_${index}`, fileInput.files[0]);
+            }
+        }
+    });
 
     const promos = Array.from(document.querySelectorAll('.promo-row')).map(row => {
         const qty       = row.querySelector('.promo-qty').value;
@@ -596,7 +687,7 @@ async function saveProduct() {
     const res = await fetch(url, { method: 'POST', headers: { 'X-CSRFToken': csrfToken }, body: formData });
     const data = await res.json();
     if (data.success) { closeModal(); location.reload(); }
-    else alert('กรุณากรอกข้อมูลให้ครบ (โดยเฉพาะชื่อสินค้าและราคาเริ่มต้น)');
+    else alert('กรุณากรอกข้อมูลให้ครบ (โดยเฉพาะชื่อสินค้าและราคา)');
 }
 
 async function editProduct(id) {
@@ -614,9 +705,9 @@ async function editProduct(id) {
 
     document.getElementById('skus-container').innerHTML = '';
     if(data.skus && data.skus.length > 0) {
-        data.skus.forEach(s => addSkuRow(s.name, s.price, s.image_url));
+        data.skus.forEach(s => addSkuRow(s.id, s.name, s.price, s.image_url));
     } else {
-        addSkuRow('ปกติ', data.price, '');
+        addSkuRow('', 'ปกติ', data.price, '');
     }
 
     document.getElementById('promos-container').innerHTML = '';
@@ -645,7 +736,6 @@ async function toggleProduct(id) {
     }
 }
 
-/* ─── Payment ─── */
 function previewNewQR(event) {
     const file = event.target.files[0];
     if (file) {
