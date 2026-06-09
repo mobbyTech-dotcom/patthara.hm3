@@ -20,4 +20,6 @@ urlpatterns = [
     path('admin-panel/payment/delete-qr/', views.payment_delete_qr, name='payment_delete_qr'),
     path('admin-panel/order/<int:order_id>/update-customer/', views.order_update_customer, name='order_update_customer'),
     path('admin-panel/order/<int:order_id>/cancel/', views.order_cancel, name='order_cancel'),
+    path('admin-panel/payment/update/', views.payment_update, name='payment_update'),
+    path('admin-panel/payment/delete-qr/', views.payment_delete_qr, name='payment_delete_qr'),
 ]
