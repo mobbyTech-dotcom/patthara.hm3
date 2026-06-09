@@ -300,10 +300,12 @@ def payment_update(request):
     payment.bank_name      = request.POST.get('bank_name', '').strip()
     payment.account_number = request.POST.get('account_number', '').strip()
     payment.account_name   = request.POST.get('account_name', '').strip()
+    
     qr_file = request.FILES.get('qr_image')
+    # ✅ ถ้ามีรูปใหม่ส่งมา ให้นำมาใส่ทับของเดิมไปเลย (ไม่ต้องสั่ง delete ของเดิมให้ระบบ Error)
     if qr_file:
-        if payment.qr_image: payment.qr_image.delete(save=False)
         payment.qr_image = qr_file
+        
     payment.save()
     return JsonResponse({'success': True})
 
@@ -311,12 +313,11 @@ def payment_update(request):
 @require_POST
 def payment_delete_qr(request):
     payment = PaymentInfo.get_singleton()
-    if payment.qr_image:
-        payment.qr_image.delete(save=False)
-        payment.qr_image = None
-        payment.save()
+    # ✅ ถอดรูปเก่าออกโดยการเซ็ตเป็น None 
+    payment.qr_image = None
+    payment.save()
     return JsonResponse({'success': True})
-# ✅ ฟังก์ชันใหม่สำหรับ "ลบออเดอร์ถาวร" เพื่อคืนพื้นที่
+    
 @login_required
 @require_POST
 def order_delete(request, order_id):
