@@ -67,10 +67,24 @@ let cart = {};
 try { cart = JSON.parse(sessionStorage.getItem('patthara_cart') || '{}'); } catch(e) {}
 
 function calculateCart() {
-    let productCounts = {};
+    const productCounts = {};
     Object.values(cart).forEach(item => {
-        if (item.qty > 0) {
-            productCounts[item.productId] = (productCounts[item.productId] || 0) + item.qty;
+        if (item.qty > 0) productCounts[item.productId] = (productCounts[item.productId] || 0) + item.qty;
+    });
+
+    // เก็บส่วนลดรวมต่อสินค้า (แบบ discount)
+    const promoDiscountTotal = {};
+    Object.values(cart).forEach(item => {
+        if (item.qty <= 0) return;
+        const pData = productsData[item.productId];
+        if (pData && pData.promos && pData.promos.length > 0) {
+            const totalQty = productCounts[item.productId];
+            for (const promo of pData.promos) {
+                if (totalQty >= promo.min_quantity && promo.promo_type === 'discount') {
+                    promoDiscountTotal[item.productId] = parseInt(promo.discount) || 0;
+                    break;
+                }
+            }
         }
     });
 
@@ -79,18 +93,21 @@ function calculateCart() {
         if (item.qty <= 0) return;
         let currentPrice = item.price;
         const pData = productsData[item.productId];
-        
         if (pData && pData.promos && pData.promos.length > 0) {
             const totalQty = productCounts[item.productId];
-            for (let promo of pData.promos) {
+            for (const promo of pData.promos) {
                 if (totalQty >= promo.min_quantity) {
-                    currentPrice = promo.special_price; break;
+                    if (promo.promo_type !== 'discount') currentPrice = promo.special_price;
+                    break;
                 }
             }
         }
         total += currentPrice * item.qty;
         cartCount += item.qty;
     });
+    // หักส่วนลดรวม
+    Object.entries(promoDiscountTotal).forEach(([pid, disc]) => { total -= disc; });
+    if (total < 0) total = 0;
     return { total, cartCount };
 }
 
@@ -110,7 +127,13 @@ function openModal(productId) {
     document.getElementById('modal-product-name').textContent = pData.name;
     const promoEl = document.getElementById('modal-promos');
     if (pData.promos.length > 0) {
-        promoEl.innerHTML = '✨ โปรโมชั่น:<br>' + pData.promos.map(pr => `- ซื้อครบ ${pr.min_quantity} ชิ้น เหลือชิ้นละ ฿${pr.special_price}`).join('<br>');
+        promoEl.innerHTML = '✨ โปรโมชั่น:<br>' + pData.promos.map(pr => {
+            if (pr.promo_type === 'discount') {
+                return `- ซื้อครบ ${pr.min_quantity} ชิ้น ลดทันที ฿${pr.discount}`;
+            } else {
+                return `- ซื้อครบ ${pr.min_quantity} ชิ้น เหลือชิ้นละ ฿${pr.special_price}`;
+            }
+        }).join('<br>');
         promoEl.classList.remove('hidden');
     } else {
         promoEl.classList.add('hidden');

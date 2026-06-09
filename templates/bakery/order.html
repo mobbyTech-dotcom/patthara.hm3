@@ -89,13 +89,14 @@ function calculateCart() {
         total += currentPrice * item.qty;
         finalItems.push({
             skuId,
-            productId:     item.productId,
-            name:          `${pData ? pData.name : ''} (${item.skuName})`,
-            price:         currentPrice,
-            qty:           item.qty,
-            originalPrice: item.price,
+            productId:      item.productId,
+            name:           `${pData ? pData.name : ''} (${item.skuName})`,
+            price:          currentPrice,
+            qty:            item.qty,
+            originalPrice:  item.price,
             hasDiscount,
-            promoType:     promo ? promo.promo_type : null,
+            promoType:      promo ? promo.promo_type : null,
+            discountAmount: (promo && promo.promo_type === 'discount') ? parseInt(promo.discount) || 0 : 0,
         });
     });
 
@@ -104,7 +105,7 @@ function calculateCart() {
     finalItems.forEach(item => {
         const promo = activePromo[item.productId];
         if (promo && promo.promo_type === 'discount' && !discountDeducted.has(item.productId)) {
-            total -= promo.discount;
+            total -= parseInt(promo.discount) || 0;
             discountDeducted.add(item.productId);
         }
     });
@@ -129,8 +130,9 @@ function renderCart() {
             : `<div class="w-14 h-14 bg-amber-100 rounded-lg flex items-center justify-center text-2xl flex-shrink-0">🧁</div>`;
         let priceHtml;
         if (item.hasDiscount && item.promoType === 'discount') {
-            // ส่วนลดรวม — แสดงราคาปกติ + badge
-            priceHtml = `<span class="text-amber-700 font-bold">฿${item.price}</span> <span class="text-xs text-green-600 bg-green-100 px-1.5 py-0.5 rounded ml-1">มีส่วนลดรวม!</span>`;
+            // ส่วนลดรวม — แสดงราคาปกติ + badge + ยอดลด
+            const discAmt = item.discountAmount ? `ลด ฿${item.discountAmount}` : 'มีส่วนลดรวม!';
+            priceHtml = `<span class="text-amber-700 font-bold">฿${item.price}</span> <span class="text-xs text-green-600 bg-green-100 px-1.5 py-0.5 rounded ml-1">${discAmt}</span>`;
         } else if (item.hasDiscount) {
             // ราคาพิเศษต่อชิ้น — แสดงราคาเดิมขีดทับ
             priceHtml = `<span class="line-through text-gray-400 text-xs mr-1">฿${item.originalPrice}</span><span class="text-green-600 font-bold">฿${item.price}</span> <span class="text-xs text-green-600 bg-green-100 px-1.5 py-0.5 rounded ml-1">ราคาโปร!</span>`;
