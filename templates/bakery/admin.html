@@ -379,18 +379,46 @@ function addSkuRow(name = '', price = '') {
     container.appendChild(row);
 }
 
-function addPromoRow(qty = '', price = '', discount = '') {
+function addPromoRow(qty = '', promoType = 'special_price', price = '', discount = '') {
     const container = document.getElementById('promos-container');
     const row = document.createElement('div');
-    row.className = 'flex gap-2 promo-row items-center bg-gray-50 p-2 rounded-lg';
+    row.className = 'flex flex-wrap gap-2 promo-row items-center bg-gray-50 p-2 rounded-lg';
+
+    const priceDisplay    = promoType === 'special_price' ? '' : 'hidden';
+    const discountDisplay = promoType === 'discount'      ? '' : 'hidden';
+
     row.innerHTML = `
-        <span class="text-xs text-gray-500">ซื้อ</span>
-        <input type="number" placeholder="ชิ้น" value="${qty}" class="promo-qty w-12 border rounded px-1 text-center text-sm">
-        <input type="number" placeholder="ราคาพิเศษ/ชิ้น" value="${price}" class="promo-price w-24 border rounded px-1 text-center text-sm">
-        <input type="number" placeholder="ส่วนลดรวม(บาท)" value="${discount}" class="promo-discount w-24 border rounded px-1 text-center text-sm">
-        <button onclick="this.parentElement.remove()" class="text-red-400 font-bold ml-auto px-2">×</button>
+        <span class="text-xs text-gray-500 whitespace-nowrap">ซื้อครบ</span>
+        <input type="number" placeholder="ชิ้น" value="${qty}" min="1"
+               class="promo-qty w-14 border rounded px-1 text-center text-sm">
+        <span class="text-xs text-gray-500">ชิ้น</span>
+        <select class="promo-type border rounded px-1 text-xs text-gray-700 bg-white"
+                onchange="togglePromoInputs(this)">
+            <option value="special_price" ${promoType==='special_price'?'selected':''}>ราคาพิเศษ/ชิ้น</option>
+            <option value="discount"      ${promoType==='discount'     ?'selected':''}>ส่วนลดรวม (฿)</option>
+        </select>
+        <input type="number" placeholder="ราคา/ชิ้น (฿)" value="${price}" min="0"
+               class="promo-price w-24 border rounded px-1 text-center text-sm ${priceDisplay}">
+        <input type="number" placeholder="ลด (฿)" value="${discount}" min="0"
+               class="promo-discount w-24 border rounded px-1 text-center text-sm ${discountDisplay}">
+        <button onclick="this.closest('.promo-row').remove()" class="text-red-400 font-bold ml-auto px-2 text-lg leading-none">×</button>
     `;
     container.appendChild(row);
+}
+
+function togglePromoInputs(selectEl) {
+    const row = selectEl.closest('.promo-row');
+    const priceInput    = row.querySelector('.promo-price');
+    const discountInput = row.querySelector('.promo-discount');
+    if (selectEl.value === 'special_price') {
+        priceInput.classList.remove('hidden');
+        discountInput.classList.add('hidden');
+        discountInput.value = '';
+    } else {
+        discountInput.classList.remove('hidden');
+        priceInput.classList.add('hidden');
+        priceInput.value = '';
+    }
 }
 
 function openModal(title = 'เพิ่มสินค้า') {
@@ -444,10 +472,13 @@ async function saveProduct() {
     })).filter(s => s.name && s.price); // กรองเอาเฉพาะอันที่กรอกครบ
 
     // รวบรวมข้อมูล Promotion ที่กรอกทั้งหมด
-    const promos = Array.from(document.querySelectorAll('.promo-row')).map(row => ({
-        min_quantity: row.querySelector('.promo-qty').value,
-        special_price: row.querySelector('.promo-price').value
-    })).filter(p => p.min_quantity && p.special_price);
+    const promos = Array.from(document.querySelectorAll('.promo-row')).map(row => {
+        const qty       = row.querySelector('.promo-qty').value;
+        const ptype     = row.querySelector('.promo-type').value;
+        const price     = row.querySelector('.promo-price').value;
+        const discount  = row.querySelector('.promo-discount').value;
+        return { min_quantity: qty, promo_type: ptype, special_price: price || null, discount: discount || null };
+    }).filter(p => p.min_quantity && (p.special_price || p.discount));
 
     // ยัดใส่ FormData ในรูปแบบข้อความ JSON
     formData.append('skus', JSON.stringify(skus));
@@ -484,7 +515,7 @@ async function editProduct(id) {
     // วาดกล่อง Promotion เดิมกลับมา
     document.getElementById('promos-container').innerHTML = '';
     if(data.promos && data.promos.length > 0) {
-        data.promos.forEach(p => addPromoRow(p.min_quantity, p.special_price));
+        data.promos.forEach(p => addPromoRow(p.min_quantity, p.promo_type || 'special_price', p.special_price || '', p.discount || ''));
     }
 
     openModal('แก้ไขสินค้า');

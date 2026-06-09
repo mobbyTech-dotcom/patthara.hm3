@@ -51,8 +51,18 @@ function calculateCart() {
     // นับจำนวนรวมต่อสินค้า (รวมทุก SKU) เพื่อตรวจโปร
     const productCounts = {};
     Object.values(cart).forEach(item => {
-        if (item.qty > 0) {
-            productCounts[item.productId] = (productCounts[item.productId] || 0) + item.qty;
+        if (item.qty > 0) productCounts[item.productId] = (productCounts[item.productId] || 0) + item.qty;
+    });
+
+    // หาโปรที่ apply ต่อสินค้า (สำหรับแสดง badge และคำนวณ)
+    const activePromo = {};  // pid -> promo object
+    Object.keys(productCounts).forEach(pid => {
+        const pData = productsData[pid];
+        if (!pData || !pData.promos) return;
+        for (const promo of pData.promos) {
+            if (productCounts[pid] >= promo.min_quantity) {
+                activePromo[pid] = promo; break;
+            }
         }
     });
 
@@ -61,21 +71,19 @@ function calculateCart() {
 
     Object.entries(cart).forEach(([skuId, item]) => {
         if (item.qty <= 0) return;
+        const pData = productsData[item.productId];
+        const promo = activePromo[item.productId];
 
         let currentPrice = item.price;
         let hasDiscount  = false;
-        const pData      = productsData[item.productId];
 
-        // ตรวจโปรโมชั่น
-        if (pData && pData.promos && pData.promos.length > 0) {
-            const totalQty = productCounts[item.productId];
-            for (const promo of pData.promos) {
-                if (totalQty >= promo.min_quantity) {
-                    currentPrice = promo.special_price;
-                    hasDiscount  = true;
-                    break;
-                }
+        if (promo) {
+            hasDiscount = true;
+            if (promo.promo_type !== 'discount') {
+                // ราคาพิเศษต่อชิ้น
+                currentPrice = promo.special_price;
             }
+            // ถ้า discount แบบรวม จะหักทีหลัง
         }
 
         total += currentPrice * item.qty;
@@ -87,8 +95,20 @@ function calculateCart() {
             qty:           item.qty,
             originalPrice: item.price,
             hasDiscount,
+            promoType:     promo ? promo.promo_type : null,
         });
     });
+
+    // หักส่วนลดรวม (discount type) — หักต่อสินค้า ไม่ใช่ต่อ SKU
+    const discountDeducted = new Set();
+    finalItems.forEach(item => {
+        const promo = activePromo[item.productId];
+        if (promo && promo.promo_type === 'discount' && !discountDeducted.has(item.productId)) {
+            total -= promo.discount;
+            discountDeducted.add(item.productId);
+        }
+    });
+    if (total < 0) total = 0;
 
     return { total, finalItems };
 }
@@ -107,9 +127,16 @@ function renderCart() {
         const imgHtml = pData && pData.image
             ? `<img src="${pData.image}" class="w-14 h-14 object-cover rounded-lg flex-shrink-0">`
             : `<div class="w-14 h-14 bg-amber-100 rounded-lg flex items-center justify-center text-2xl flex-shrink-0">🧁</div>`;
-        const priceHtml = item.hasDiscount
-            ? `<span class="line-through text-gray-400 text-xs mr-1">฿${item.originalPrice}</span><span class="text-green-600 font-bold">฿${item.price}</span> <span class="text-xs text-green-600 bg-green-100 px-1.5 py-0.5 rounded ml-1">ราคาโปร!</span>`
-            : `<span class="text-amber-700 font-bold">฿${item.price}</span>`;
+        let priceHtml;
+        if (item.hasDiscount && item.promoType === 'discount') {
+            // ส่วนลดรวม — แสดงราคาปกติ + badge
+            priceHtml = `<span class="text-amber-700 font-bold">฿${item.price}</span> <span class="text-xs text-green-600 bg-green-100 px-1.5 py-0.5 rounded ml-1">มีส่วนลดรวม!</span>`;
+        } else if (item.hasDiscount) {
+            // ราคาพิเศษต่อชิ้น — แสดงราคาเดิมขีดทับ
+            priceHtml = `<span class="line-through text-gray-400 text-xs mr-1">฿${item.originalPrice}</span><span class="text-green-600 font-bold">฿${item.price}</span> <span class="text-xs text-green-600 bg-green-100 px-1.5 py-0.5 rounded ml-1">ราคาโปร!</span>`;
+        } else {
+            priceHtml = `<span class="text-amber-700 font-bold">฿${item.price}</span>`;
+        }
 
         return `
         <div class="flex items-center gap-3 border rounded-xl p-3">
