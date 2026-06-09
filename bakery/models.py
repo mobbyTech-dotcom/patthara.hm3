@@ -2,7 +2,7 @@ from django.db import models
 from cloudinary.models import CloudinaryField
 import random
 import string
-from django.db import models
+
 
 def generate_order_number():
     """สร้างเลขออเดอร์สุ่ม 8 หลัก เช่น PT-A3X9K2MQ"""
@@ -10,13 +10,13 @@ def generate_order_number():
     suffix = ''.join(random.choices(chars, k=8))
     return f'PT-{suffix}'
 
+
 class Product(models.Model):
-    name        = models.CharField(max_length=200, verbose_name='ชื่อสินค้า')
-    price       = models.PositiveIntegerField(verbose_name='ราคาเริ่มต้น (บาท)')
-    description = models.TextField(blank=True, verbose_name='รายละเอียด')
-    image       = CloudinaryField('image', folder='patthara/products')
+    name         = models.CharField(max_length=200, verbose_name='ชื่อสินค้า')
+    description  = models.TextField(blank=True, verbose_name='รายละเอียด')
+    image        = CloudinaryField('image', folder='patthara/products')
     is_available = models.BooleanField(default=True, verbose_name='เปิดขาย')
-    created_at  = models.DateTimeField(auto_now_add=True)
+    created_at   = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         verbose_name        = 'สินค้า'
@@ -26,6 +26,13 @@ class Product(models.Model):
     def __str__(self):
         return self.name
 
+    @property
+    def base_price(self):
+        """ราคาต่ำสุดของ SKU ที่มี"""
+        sku = self.skus.order_by('price').first()
+        return sku.price if sku else 0
+
+
 class ProductSKU(models.Model):
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='skus')
     name    = models.CharField(max_length=100, verbose_name='ชื่อตัวเลือก (เช่น รสช็อกโกแลต)')
@@ -34,14 +41,15 @@ class ProductSKU(models.Model):
     class Meta:
         verbose_name        = 'ตัวเลือกสินค้า (SKU)'
         verbose_name_plural = 'ตัวเลือกสินค้า (SKUs)'
+        ordering            = ['price']
 
     def __str__(self):
         return f"{self.product.name} - {self.name}"
 
+
 class Promotion(models.Model):
     product       = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='promotions')
     min_quantity  = models.PositiveIntegerField(verbose_name='ซื้อครบ (ชิ้น)')
-    discount_amount = models.PositiveIntegerField(default=0, verbose_name='ส่วนลดรวม (บาท)')
     special_price = models.PositiveIntegerField(verbose_name='ราคาพิเศษต่อชิ้น (บาท)')
 
     class Meta:
@@ -51,6 +59,7 @@ class Promotion(models.Model):
 
     def __str__(self):
         return f"ซื้อ {self.min_quantity} ชิ้น เหลือชิ้นละ {self.special_price} บาท"
+
 
 class Order(models.Model):
     STATUS_CHOICES = [
@@ -89,6 +98,7 @@ class Order(models.Model):
             'done':      'bg-green-100 text-green-700',
         }.get(self.status, 'bg-gray-100 text-gray-500')
 
+
 class OrderItem(models.Model):
     order        = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='items')
     product_name = models.CharField(max_length=200)
@@ -101,6 +111,7 @@ class OrderItem(models.Model):
 
     def __str__(self):
         return f'{self.product_name} x{self.quantity}'
+
 
 class PaymentInfo(models.Model):
     bank_name      = models.CharField(max_length=100, verbose_name='ชื่อธนาคาร', blank=True)
