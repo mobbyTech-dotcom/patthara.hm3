@@ -82,6 +82,17 @@
     </div>
 
     <div id="panel-orders" class="hidden">
+        <div class="flex gap-4 mb-5">
+            <div class="bg-yellow-50 flex-1 p-3 rounded-xl border border-yellow-100 flex items-center justify-between shadow-sm">
+                <div><p class="text-xs text-yellow-600 font-semibold mb-1">รอดำเนินการ</p><p class="text-2xl font-bold text-yellow-700">{{ pending_count }}</p></div>
+                <div class="text-3xl">⏳</div>
+            </div>
+            <div class="bg-blue-50 flex-1 p-3 rounded-xl border border-blue-100 flex items-center justify-between shadow-sm">
+                <div><p class="text-xs text-blue-600 font-semibold mb-1">ยืนยันแล้ว</p><p class="text-2xl font-bold text-blue-700">{{ confirmed_count }}</p></div>
+                <div class="text-3xl">✅</div>
+            </div>
+        </div>
+
         <div class="flex gap-2 mb-4 flex-wrap items-center">
             <button onclick="filterOrders('all')" id="filter-all"
                     class="filter-btn active-filter px-4 py-1.5 rounded-full text-sm font-semibold transition">
@@ -109,10 +120,14 @@
             {% for order in orders %}
             <div class="bg-white rounded-2xl shadow-sm overflow-hidden order-card" data-status="{{ order.status }}" id="order-card-{{ order.id }}">
                 <div class="flex items-center justify-between px-5 py-3 bg-gray-50 border-b">
-                    <div class="flex items-center gap-3">
-                        <span class="font-bold text-gray-700">#{{ order.id }}</span>
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <span class="font-bold text-gray-700">#{{ order.order_number }}</span>
                         <span class="text-sm text-gray-500">{{ order.customer_name }}</span>
                         <span class="text-xs text-gray-400">{{ order.created_at|date:"d/m/Y H:i" }}</span>
+                        <button onclick="openEditOrderModal({{ order.id }}, '{{ order.customer_name|escapejs }}', '{{ order.phone|escapejs }}', '{{ order.address|escapejs }}', '{{ order.appointment_date|date:'Y-m-d' }}', '{{ order.note|escapejs }}')" 
+                                class="text-xs bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full hover:bg-blue-200 transition ml-2">
+                            ✏️ แก้ไขข้อมูล
+                        </button>
                     </div>
                     <div class="flex items-center gap-2">
                         <select onchange="updateOrderStatus({{ order.id }}, this.value)"
@@ -278,6 +293,7 @@
                     <button type="button" onclick="addSkuRow()" class="text-xs bg-amber-100 text-amber-700 px-2 py-1.5 rounded hover:bg-amber-200 font-semibold">+ เพิ่มตัวเลือก</button>
                 </div>
                 <div id="skus-container" class="space-y-2"></div>
+                <p class="text-xs text-gray-400 mt-2">* หากต้องการเพิ่ม/เปลี่ยนรูปภาพ SKU กรุณาจัดการที่ระบบหลังบ้านของ Django (<code>/admin/</code>)</p>
             </div>
 
             <hr class="my-4 border-gray-100">
@@ -290,9 +306,28 @@
                 <div id="promos-container" class="space-y-2"></div>
             </div>
             
-        </div> <div class="flex gap-3 pt-4 border-t mt-auto shrink-0">
+        </div> 
+        <div class="flex gap-3 pt-4 border-t mt-auto shrink-0">
             <button onclick="saveProduct()" class="flex-1 bg-amber-600 hover:bg-amber-700 text-white font-semibold py-2.5 rounded-xl text-sm transition shadow-md">บันทึก</button>
             <button onclick="closeModal()" class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-2.5 rounded-xl text-sm transition">ยกเลิก</button>
+        </div>
+    </div>
+</div>
+
+<div id="edit-order-modal" class="hidden fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
+        <h2 class="text-lg font-bold text-gray-800 mb-4">📝 แก้ไขข้อมูลจัดส่ง</h2>
+        <input type="hidden" id="edit-order-id">
+        <div class="space-y-3">
+            <input type="text" id="edit-order-name" class="w-full border rounded-xl px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-amber-400 focus:outline-none" placeholder="ชื่อ-นามสกุล">
+            <input type="tel" id="edit-order-phone" class="w-full border rounded-xl px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-amber-400 focus:outline-none" placeholder="เบอร์โทรศัพท์">
+            <textarea id="edit-order-address" rows="2" class="w-full border rounded-xl px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-amber-400 focus:outline-none" placeholder="ที่อยู่"></textarea>
+            <input type="date" id="edit-order-date" class="w-full border rounded-xl px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-amber-400 focus:outline-none">
+            <textarea id="edit-order-note" rows="2" class="w-full border rounded-xl px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-amber-400 focus:outline-none" placeholder="หมายเหตุ"></textarea>
+        </div>
+        <div class="flex gap-3 pt-4 mt-2">
+            <button onclick="saveEditOrder()" class="flex-1 bg-amber-600 hover:bg-amber-700 text-white font-semibold py-2.5 rounded-xl text-sm transition">บันทึก</button>
+            <button onclick="closeEditOrderModal()" class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-2.5 rounded-xl text-sm transition">ยกเลิก</button>
         </div>
     </div>
 </div>
@@ -346,19 +381,43 @@ async function updateOrderStatus(orderId, status) {
             done:      'bg-green-50 text-green-700 border-green-200',
         };
         sel.classList.add(...colorMap[status].split(' '));
-        updateActiveOrdersBadge();
     }
 }
-function updateActiveOrdersBadge() {
-    const activeCount = document.querySelectorAll('.order-card[data-status="pending"], .order-card[data-status="confirmed"]').length;
-    const tabBtn = document.getElementById('tab-orders');
-    const oldBadge = tabBtn.querySelector('span');
-    if (oldBadge) oldBadge.remove();
-    if (activeCount > 0) {
-        const badge = document.createElement('span');
-        badge.className = 'ml-1 bg-amber-500 text-white text-xs px-1.5 py-0.5 rounded-full';
-        badge.textContent = activeCount;
-        tabBtn.appendChild(badge);
+
+/* ─── Edit Order Modal ─── */
+function openEditOrderModal(id, name, phone, address, date, note) {
+    document.getElementById('edit-order-id').value = id;
+    document.getElementById('edit-order-name').value = name;
+    document.getElementById('edit-order-phone').value = phone;
+    document.getElementById('edit-order-address').value = address;
+    document.getElementById('edit-order-date').value = date;
+    document.getElementById('edit-order-note').value = (note && note !== 'None') ? note : '';
+    document.getElementById('edit-order-modal').classList.remove('hidden');
+}
+
+function closeEditOrderModal() {
+    document.getElementById('edit-order-modal').classList.add('hidden');
+}
+
+async function saveEditOrder() {
+    const id = document.getElementById('edit-order-id').value;
+    const formData = new FormData();
+    formData.append('customer_name', document.getElementById('edit-order-name').value);
+    formData.append('phone', document.getElementById('edit-order-phone').value);
+    formData.append('address', document.getElementById('edit-order-address').value);
+    formData.append('appointment_date', document.getElementById('edit-order-date').value);
+    formData.append('note', document.getElementById('edit-order-note').value);
+
+    const res = await fetch(`/admin-panel/order/${id}/update-customer/`, { 
+        method: 'POST', 
+        headers: { 'X-CSRFToken': csrfToken }, 
+        body: formData 
+    });
+    const data = await res.json();
+    if (data.success) {
+        location.reload(); 
+    } else {
+        alert('เกิดข้อผิดพลาดในการบันทึก');
     }
 }
 
@@ -368,12 +427,21 @@ function closeSlipModal() { document.getElementById('slip-modal').classList.add(
 
 
 /* ─── Product Modal (รวมระบบ SKU และ Promotion) ─── */
-
-function addSkuRow(name = '', price = '') {
+function addSkuRow(name = '', price = '', imageUrl = '') {
     const container = document.getElementById('skus-container');
     const row = document.createElement('div');
     row.className = 'flex gap-2 sku-row items-center';
+    
+    // แสดงรูป SKU (ถ้ามีข้อมูลจากหลังบ้าน)
+    let imgHtml = '';
+    if (imageUrl) {
+        imgHtml = `<img src="${imageUrl}" class="w-8 h-8 rounded object-cover border">`;
+    } else {
+        imgHtml = `<div class="w-8 h-8 rounded bg-gray-100 border flex items-center justify-center text-[10px] text-gray-400">รูป</div>`;
+    }
+
     row.innerHTML = `
+        ${imgHtml}
         <input type="text" placeholder="เช่น รสช็อกโกแลต" value="${name}" class="sku-name flex-1 border rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-amber-400 focus:outline-none">
         <input type="number" placeholder="ราคา" value="${price}" class="sku-price w-24 border rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-amber-400 focus:outline-none">
         <button onclick="this.parentElement.remove()" class="text-red-400 hover:text-red-600 font-bold px-1 text-xl leading-none">×</button>
@@ -427,7 +495,6 @@ function openModal(title = 'เพิ่มสินค้า') {
     document.getElementById('modal-title').textContent = title;
     document.getElementById('modal').classList.remove('hidden');
     
-    // ถ้าเป็นการกดเพิ่มสินค้าใหม่ ให้มีกล่อง SKU รอไว้อันนึงเผื่อตั้งราคาปกติ
     if(title === 'เพิ่มสินค้า') {
         if(document.getElementById('skus-container').children.length === 0) {
             addSkuRow('ปกติ', '');
@@ -441,7 +508,6 @@ function closeModal() {
     document.getElementById('prod-img-file').value = '';
     document.getElementById('img-preview-wrap').classList.add('hidden');
     
-    // เคลียร์กล่อง SKU และ Promo ออกให้หมดเพื่อรอรอบใหม่
     document.getElementById('skus-container').innerHTML = '';
     document.getElementById('promos-container').innerHTML = '';
 }
@@ -467,13 +533,11 @@ async function saveProduct() {
     const imgFile = document.getElementById('prod-img-file').files[0];
     if (imgFile) formData.append('image', imgFile);
 
-    // รวบรวมข้อมูล SKU ที่กรอกทั้งหมด
     const skus = Array.from(document.querySelectorAll('.sku-row')).map(row => ({
         name: row.querySelector('.sku-name').value.trim(),
         price: row.querySelector('.sku-price').value
-    })).filter(s => s.name && s.price); // กรองเอาเฉพาะอันที่กรอกครบ
+    })).filter(s => s.name && s.price); 
 
-    // รวบรวมข้อมูล Promotion ที่กรอกทั้งหมด
     const promos = Array.from(document.querySelectorAll('.promo-row')).map(row => {
         const qty       = row.querySelector('.promo-qty').value;
         const ptype     = row.querySelector('.promo-type').value;
@@ -482,7 +546,6 @@ async function saveProduct() {
         return { min_quantity: qty, promo_type: ptype, special_price: price || null, discount: discount || null };
     }).filter(p => p.min_quantity && (p.special_price || p.discount));
 
-    // ยัดใส่ FormData ในรูปแบบข้อความ JSON
     formData.append('skus', JSON.stringify(skus));
     formData.append('promos', JSON.stringify(promos));
 
@@ -506,15 +569,13 @@ async function editProduct(id) {
         document.getElementById('img-preview-wrap').classList.remove('hidden');
     }
 
-    // วาดกล่อง SKU เดิมกลับมา
     document.getElementById('skus-container').innerHTML = '';
     if(data.skus && data.skus.length > 0) {
-        data.skus.forEach(s => addSkuRow(s.name, s.price));
+        data.skus.forEach(s => addSkuRow(s.name, s.price, s.image_url)); // โชว์รูป SKU ถ้ามี
     } else {
-        addSkuRow('ปกติ', data.price);
+        addSkuRow('ปกติ', data.price, '');
     }
 
-    // วาดกล่อง Promotion เดิมกลับมา
     document.getElementById('promos-container').innerHTML = '';
     if(data.promos && data.promos.length > 0) {
         data.promos.forEach(p => addPromoRow(p.min_quantity, p.promo_type || 'special_price', p.special_price || '', p.discount || ''));
