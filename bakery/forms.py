@@ -4,16 +4,12 @@ from .models import Product
 
 class ProductForm(forms.ModelForm):
     class Meta:
-        model = Product
-        fields = ['name', 'price', 'description', 'image']
+        model  = Product
+        fields = ['name', 'description', 'image']   # ลบ 'price' ออก เพราะราคาอยู่ใน SKU แล้ว
         widgets = {
             'name': forms.TextInput(attrs={
                 'class': 'w-full border rounded-xl px-3.5 py-2 text-sm focus:ring-2 focus:ring-blue-400',
                 'placeholder': 'ชื่อสินค้า'
-            }),
-            'price': forms.NumberInput(attrs={
-                'class': 'w-full border rounded-xl px-3.5 py-2 text-sm focus:ring-2 focus:ring-blue-400',
-                'min': '0'
             }),
             'description': forms.Textarea(attrs={
                 'class': 'w-full border rounded-xl px-3.5 py-2 text-sm focus:ring-2 focus:ring-blue-400',
