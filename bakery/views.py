@@ -316,6 +316,20 @@ def payment_delete_qr(request):
         payment.qr_image = None
         payment.save()
     return JsonResponse({'success': True})
-
+# ✅ ฟังก์ชันใหม่สำหรับ "ลบออเดอร์ถาวร" เพื่อคืนพื้นที่
+@login_required
+@require_POST
+def order_delete(request, order_id):
+    order = get_object_or_404(Order, id=order_id)
+    try:
+        # ถ้ามีรูปสลิป ให้ลบรูปออกจาก Cloudinary ด้วยเพื่อประหยัดพื้นที่
+        if order.slip_image:
+            order.slip_image.delete(save=False)
+    except Exception:
+        pass
+    
+    order.delete()
+    return JsonResponse({'success': True})
+    
 def handler404(request, exception=None):
     return render(request, 'bakery/404.html', status=404)
