@@ -663,6 +663,7 @@ async function saveProduct() {
     if (imgFile) formData.append('image', imgFile);
 
     const skus = [];
+    // ✅ มั่นใจว่าลูปส่งข้อมูลตัวแปร originalIndex และไฟล์ภาพจับคู่กันถูกต้องเรียงตามลำดับ
     Array.from(document.querySelectorAll('.sku-row')).forEach((row, index) => {
         const name = row.querySelector('.sku-name').value.trim();
         const price = row.querySelector('.sku-price').value;
@@ -692,8 +693,9 @@ async function saveProduct() {
     const res = await fetch(url, { method: 'POST', headers: { 'X-CSRFToken': csrfToken }, body: formData });
     const data = await res.json();
     if (data.success) { closeModal(); location.reload(); }
-    else alert('กรุณากรอกข้อมูลให้ครบ (โดยเฉพาะชื่อสินค้าและราคา)');
+    else alert('เกิดข้อผิดพลาด: ' + (data.error || 'กรุณากรอกข้อมูลให้ครบถ้วน'));
 }
+
 
 async function editProduct(id) {
     const res = await fetch(`/admin-panel/edit/${id}/`);
