@@ -171,20 +171,32 @@ def product_add(request):
             skus = json.loads(request.POST.get('skus', '[]'))
             promos = json.loads(request.POST.get('promos', '[]'))
             
-            for item in skus:
-                idx = item.get('originalIndex')
-                image_file = request.FILES.get(f'sku_image_{idx}')
-                ProductSKU.objects.create(product=product, name=item['name'], price=item['price'], image=image_file)
+            # ✅ แก้ไขลูปบันทึก SKU ใหม่ให้ดึงรูปตาม index ที่หน้าบ้านส่งมาอย่างถูกต้อง
+            for index, item in enumerate(skus):
+                orig_idx = item.get('originalIndex', index)
+                image_file = request.FILES.get(f'sku_image_{orig_idx}')
+                ProductSKU.objects.create(
+                    product=product, 
+                    name=item['name'], 
+                    price=item['price'],
+                    image=image_file
+                )
                 
             for promo in promos:
                 Promotion.objects.create(
-                    product=product, min_quantity=promo['min_quantity'], promo_type=promo.get('promo_type', 'special_price'),
-                    special_price=promo.get('special_price') or 0, discount=promo.get('discount') or 0
+                    product=product, 
+                    min_quantity=promo['min_quantity'], 
+                    promo_type=promo.get('promo_type', 'special_price'),
+                    special_price=promo.get('special_price') or 0,
+                    discount=promo.get('discount') or 0
                 )
+            return JsonResponse({'success': True})
         except Exception as e:
             print("Error saving SKUs/Promos:", e)
-        return JsonResponse({'success': True})
+            return JsonResponse({'success': False, 'error': str(e)})
+            
     return JsonResponse({'success': False, 'errors': form.errors})
+
 
 @login_required
 def product_edit(request, pk):
@@ -194,38 +206,52 @@ def product_edit(request, pk):
         if form.is_valid():
             product = form.save()
             try:
+                # --- จัดการ SKU ---
                 skus_data = json.loads(request.POST.get('skus', '[]'))
                 existing_skus = {str(sku.id): sku for sku in product.skus.all()}
                 kept_sku_ids = []
                 
-                for item in skus_data:
-                    idx = item.get('originalIndex')
-                    image_file = request.FILES.get(f'sku_image_{idx}')
+                # ✅ แก้ไขการดึงรูปภาพของ SKU ตอนแก้ไขให้ตรงกับหน้าบ้าน
+                for index, item in enumerate(skus_data):
+                    orig_idx = item.get('originalIndex', index)
+                    image_file = request.FILES.get(f'sku_image_{orig_idx}')
                     sku_id = str(item.get('id', ''))
                     
                     if sku_id and sku_id in existing_skus:
                         sku = existing_skus[sku_id]
                         sku.name = item['name']
                         sku.price = item['price']
-                        if image_file: sku.image = image_file
+                        if image_file: 
+                            sku.image = image_file
                         sku.save()
                         kept_sku_ids.append(sku.id)
                     else:
-                        new_sku = ProductSKU.objects.create(product=product, name=item['name'], price=item['price'], image=image_file)
+                        new_sku = ProductSKU.objects.create(
+                            product=product,
+                            name=item['name'],
+                            price=item['price'],
+                            image=image_file
+                        )
                         kept_sku_ids.append(new_sku.id)
                 
                 product.skus.exclude(id__in=kept_sku_ids).delete()
                 
+                # --- จัดการ Promotion ---
                 product.promotions.all().delete()
                 promos = json.loads(request.POST.get('promos', '[]'))
                 for promo in promos:
                     Promotion.objects.create(
-                        product=product, min_quantity=promo['min_quantity'], promo_type=promo.get('promo_type', 'special_price'),
-                        special_price=promo.get('special_price') or 0, discount=promo.get('discount') or 0
+                        product=product, 
+                        min_quantity=promo['min_quantity'], 
+                        promo_type=promo.get('promo_type', 'special_price'),
+                        special_price=promo.get('special_price') or 0,
+                        discount=promo.get('discount') or 0
                     )
+                return JsonResponse({'success': True})
             except Exception as e:
                 print("Error Edit SKU/Promo:", e)
-            return JsonResponse({'success': True})
+                return JsonResponse({'success': False, 'error': str(e)})
+                
         return JsonResponse({'success': False, 'errors': form.errors})
     
     fallback_price = getattr(product, 'price', getattr(product, 'base_price', 0))
