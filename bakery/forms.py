@@ -22,3 +22,7 @@ class ProductForm(forms.ModelForm):
                 'onchange': 'previewImage(event)'
             }),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['image'].required = False  # ✅ อนุญาตให้บันทึกสินค้าโดยไม่มีรูปได้
