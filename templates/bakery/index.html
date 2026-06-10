@@ -19,7 +19,7 @@
             {% endif %}
             <div class="p-3 flex flex-col flex-1 text-center">
                 <h3 class="font-semibold text-gray-800 text-sm mb-1">{{ product.name }}</h3>
-                <p class="text-amber-700 font-bold text-sm mb-3">เริ่มต้น ฿{{ product.price }}</p>
+                <p class="text-amber-700 font-bold text-sm mb-3">เริ่มต้น ฿{{ product.base_price }}</p>
                 <button class="mt-auto bg-amber-100 text-amber-800 hover:bg-amber-200 transition py-2 rounded-xl text-xs font-bold w-full">
                     เลือกรสชาติ / จำนวน
                 </button>
@@ -48,6 +48,14 @@
     <div class="text-center mt-10 flex justify-center gap-6">
         <a href="{% url 'track_order' %}" class="text-sm text-amber-600 hover:underline">📦 ติดตามออเดอร์</a>
         <a href="{% url 'login' %}" class="text-xs text-gray-300 hover:text-gray-400">จัดการร้าน</a>
+    </div>
+</div>
+
+<div id="img-popup" class="hidden fixed inset-0 bg-black bg-opacity-80 z-[60] flex items-center justify-center p-4" onclick="closeImagePopup()">
+    <div class="relative max-w-sm w-full" onclick="event.stopPropagation()">
+        <button onclick="closeImagePopup()" class="absolute -top-3 -right-3 w-8 h-8 bg-white rounded-full flex items-center justify-center font-bold text-gray-600 hover:bg-gray-100 shadow-lg z-10">✕</button>
+        <img id="img-popup-src" src="" alt="" class="w-full rounded-2xl shadow-2xl max-h-[80vh] object-contain bg-white">
+        <p id="img-popup-name" class="text-white text-center mt-3 font-semibold text-sm"></p>
     </div>
 </div>
 
@@ -142,13 +150,21 @@ function openModal(productId) {
     const skusContainer = document.getElementById('modal-skus-container');
     skusContainer.innerHTML = pData.skus.map(sku => {
         const currentQty = cart[sku.id] ? cart[sku.id].qty : 0;
+        const imgHtml = sku.image_url
+            ? `<img src="${sku.image_url}" alt="${sku.name}"
+                    class="w-14 h-14 object-cover rounded-xl mr-3 cursor-pointer hover:opacity-80 transition flex-shrink-0 border border-amber-100 shadow-sm"
+                    onclick="openImagePopup('${sku.image_url}', '${sku.name.replace(/'/g,"\\'")}'); event.stopPropagation();">`
+            : `<div class="w-14 h-14 rounded-xl mr-3 bg-amber-50 flex items-center justify-center text-2xl flex-shrink-0">🧁</div>`;
         return `
         <div class="flex items-center justify-between border-b pb-3 border-gray-100 last:border-0 last:pb-0">
-            <div>
-                <p class="font-semibold text-gray-800">${sku.name}</p>
-                <p class="text-amber-700 text-sm font-bold">฿${sku.price}</p>
+            <div class="flex items-center flex-1 min-w-0">
+                ${imgHtml}
+                <div class="min-w-0">
+                    <p class="font-semibold text-gray-800">${sku.name}</p>
+                    <p class="text-amber-700 text-sm font-bold">฿${sku.price}</p>
+                </div>
             </div>
-            <div class="flex items-center gap-3">
+            <div class="flex items-center gap-3 ml-3 flex-shrink-0">
                 <button onclick="changeQty('${sku.id}', ${productId}, '${sku.name}', ${sku.price}, -1)" class="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 font-bold text-lg flex items-center justify-center">-</button>
                 <span id="modal-qty-${sku.id}" class="w-6 text-center font-bold">${currentQty}</span>
                 <button onclick="changeQty('${sku.id}', ${productId}, '${sku.name}', ${sku.price}, 1)" class="w-8 h-8 rounded-full bg-amber-500 hover:bg-amber-600 text-white font-bold text-lg flex items-center justify-center">+</button>
@@ -157,6 +173,16 @@ function openModal(productId) {
     }).join('');
 
     document.getElementById('sku-modal').classList.remove('hidden');
+}
+
+function openImagePopup(url, name) {
+    document.getElementById('img-popup-src').src = url;
+    document.getElementById('img-popup-name').textContent = name;
+    document.getElementById('img-popup').classList.remove('hidden');
+}
+
+function closeImagePopup() {
+    document.getElementById('img-popup').classList.add('hidden');
 }
 
 function closeModal() { document.getElementById('sku-modal').classList.add('hidden'); }
