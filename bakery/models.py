@@ -11,7 +11,7 @@ def generate_order_number():
 class Product(models.Model):
     name         = models.CharField(max_length=200, verbose_name='ชื่อสินค้า')
     description  = models.TextField(blank=True, verbose_name='รายละเอียด')
-    image        = CloudinaryField('image', folder='patthara/products')
+    image        = CloudinaryField('image', folder='patthara/products', blank=True, null=True)
     is_available = models.BooleanField(default=True, verbose_name='เปิดขาย')
     created_at   = models.DateTimeField(auto_now_add=True)
 
