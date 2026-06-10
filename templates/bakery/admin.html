@@ -655,21 +655,29 @@ function previewImage(event) {
 
 async function saveProduct() {
     const id = document.getElementById('prod-id').value;
+
+    // ✅ Validate ชื่อสินค้าก่อน
+    const productName = document.getElementById('prod-name').value.trim();
+    if (!productName) {
+        alert('กรุณากรอกชื่อสินค้า');
+        document.getElementById('prod-name').focus();
+        return;
+    }
+
     const formData = new FormData();
-    formData.append('name', document.getElementById('prod-name').value);
-    formData.append('price', document.getElementById('prod-price').value);
+    formData.append('name', productName);
     formData.append('description', document.getElementById('prod-desc').value);
     const imgFile = document.getElementById('prod-img-file').files[0];
     if (imgFile) formData.append('image', imgFile);
 
     const skus = [];
-    // ✅ มั่นใจว่าลูปส่งข้อมูลตัวแปร originalIndex และไฟล์ภาพจับคู่กันถูกต้องเรียงตามลำดับ
+    // ✅ ใช้ price !== '' แทน truthy check เพื่อรองรับราคา 0
     Array.from(document.querySelectorAll('.sku-row')).forEach((row, index) => {
         const name = row.querySelector('.sku-name').value.trim();
-        const price = row.querySelector('.sku-price').value;
+        const price = row.querySelector('.sku-price').value.trim();
         const skuId = row.dataset.id;
         
-        if (name && price) {
+        if (name && price !== '') {
             skus.push({ id: skuId, name: name, price: price, originalIndex: index });
             const fileInput = row.querySelector('.sku-image-input');
             if (fileInput && fileInput.files.length > 0) {
@@ -677,6 +685,12 @@ async function saveProduct() {
             }
         }
     });
+
+    // ✅ ต้องมีอย่างน้อย 1 SKU
+    if (skus.length === 0) {
+        alert('กรุณาเพิ่มตัวเลือกสินค้า (SKU) อย่างน้อย 1 รายการ พร้อมกรอกชื่อและราคา');
+        return;
+    }
 
     const promos = Array.from(document.querySelectorAll('.promo-row')).map(row => {
         const qty       = row.querySelector('.promo-qty').value;
@@ -693,7 +707,15 @@ async function saveProduct() {
     const res = await fetch(url, { method: 'POST', headers: { 'X-CSRFToken': csrfToken }, body: formData });
     const data = await res.json();
     if (data.success) { closeModal(); location.reload(); }
-    else alert('เกิดข้อผิดพลาด: ' + (data.error || 'กรุณากรอกข้อมูลให้ครบถ้วน'));
+    else {
+        // ✅ แสดง error จาก Django form validation ให้ชัดขึ้น
+        if (data.errors) {
+            const msgs = Object.entries(data.errors).map(([f, e]) => `${f}: ${e}`).join('\n');
+            alert('ข้อมูลไม่ถูกต้อง:\n' + msgs);
+        } else {
+            alert('เกิดข้อผิดพลาด: ' + (data.error || 'ไม่ทราบสาเหตุ'));
+        }
+    }
 }
 
 
