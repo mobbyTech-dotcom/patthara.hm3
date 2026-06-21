@@ -20,6 +20,7 @@ urlpatterns = [
     
     # --- ระบบ จัดการออเดอร์ ---
     path('admin-panel/order/<int:order_id>/status/', views.order_update_status, name='order_update_status'),
+    path('admin-panel/order/<int:order_id>/payment-method/', views.order_update_payment_method, name='order_update_payment_method'),
     path('admin-panel/order/<int:order_id>/update-customer/', views.order_update_customer, name='order_update_customer'),
     path('admin-panel/order/<int:order_id>/cancel/', views.order_cancel, name='order_cancel'),
     path('admin-panel/order/<int:order_id>/delete/', views.order_delete, name='order_delete'), # ✅ เพิ่มสำหรับลบออเดอร์ถาวร
