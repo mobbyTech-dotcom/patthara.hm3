@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.utils.html import format_html
-from .models import Product, ProductSKU, Promotion, Order, OrderItem, PaymentInfo
+from .models import Product, ProductSKU, Promotion, ProductIngredient, Order, OrderItem, PaymentInfo
 
 class ProductSKUInline(admin.TabularInline):
     model = ProductSKU
@@ -18,10 +18,14 @@ class PromotionInline(admin.TabularInline):
     model = Promotion
     extra = 1
 
+class ProductIngredientInline(admin.TabularInline):
+    model = ProductIngredient
+    extra = 1
+
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
-    list_display = ('name', 'price', 'is_available', 'created_at')
-    inlines = [ProductSKUInline, PromotionInline]
+    list_display = ('name', 'is_available', 'created_at')
+    inlines = [ProductSKUInline, PromotionInline, ProductIngredientInline]
 
 class OrderItemInline(admin.TabularInline):
     model = OrderItem
