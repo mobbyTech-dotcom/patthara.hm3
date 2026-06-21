@@ -1,6 +1,11 @@
 {% extends 'base.html' %}
 {% block title %}จัดการร้าน - ภัทรา Homemade{% endblock %}
 
+{% block extra_head %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+{% endblock %}
+
 {% block content %}
 <div class="max-w-5xl mx-auto px-4 py-8">
     <div class="flex items-center justify-between mb-8">
@@ -267,6 +272,7 @@
     </div>
 </div>
 
+<!-- ════════════════════════════ SALES MODAL ════════════════════════════ -->
 <div id="sales-modal" class="hidden fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4">
     <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
         <div class="flex items-center justify-between mb-5">
@@ -277,60 +283,79 @@
             <button onclick="closeSalesSummary()" class="text-gray-400 hover:text-gray-600 text-xl font-bold leading-none">✕</button>
         </div>
 
-        <div class="flex items-center justify-between mb-2 pb-2 border-b">
-            <label class="flex items-center gap-2 text-sm font-semibold text-gray-700 cursor-pointer">
-                <input type="checkbox" id="sales-select-all" checked onchange="toggleSelectAllSales(this)" class="w-4 h-4 accent-amber-600">
-                เลือกทั้งหมด
-            </label>
-            <span class="text-xs text-gray-400">เหมือนเลือกใส่ตะกร้า — ไม่ติ๊กออเดอร์ไหน ก็ไม่ถูกรวมยอด</span>
-        </div>
-        <div class="max-h-40 overflow-y-auto space-y-1.5 mb-4 pr-1">
-            {% for o in done_orders %}
-            <label class="flex items-center justify-between gap-2 bg-gray-50 hover:bg-gray-100 rounded-lg px-3 py-2 cursor-pointer text-sm">
-                <span class="flex items-center gap-2 min-w-0">
-                    <input type="checkbox" class="sales-order-check w-4 h-4 accent-amber-600 shrink-0" value="{{ o.id }}" checked onchange="recalcSalesSummary()">
-                    <span class="font-semibold text-gray-700 shrink-0">#{{ o.order_number }}</span>
-                    <span class="text-gray-400 truncate">{{ o.customer_name }}</span>
-                </span>
-                <span class="font-bold text-amber-700 shrink-0">฿{{ o.total }}</span>
-            </label>
-            {% empty %}
-            <p class="text-center text-gray-400 text-sm py-4">ยังไม่มีออเดอร์ที่เสร็จสิ้น</p>
-            {% endfor %}
-        </div>
+        <!-- ✅ ส่วนที่จะถูก capture เป็น PNG/PDF -->
+        <div id="sales-export-area" class="bg-white p-2 rounded-xl">
 
-        <div class="grid grid-cols-2 gap-3 mb-5">
-            <div class="bg-amber-50 border border-amber-100 rounded-xl p-4 text-center">
-                <p class="text-2xl font-extrabold text-amber-700" id="sales-grand-total">฿{{ sales_total|floatformat:"0" }}</p>
-                <p class="text-xs text-amber-500 mt-1 font-semibold">ยอดขายรวม (ที่เลือก)</p>
+            <div class="flex items-center justify-between mb-2 pb-2 border-b">
+                <label class="flex items-center gap-2 text-sm font-semibold text-gray-700 cursor-pointer">
+                    <input type="checkbox" id="sales-select-all" checked onchange="toggleSelectAllSales(this)" class="w-4 h-4 accent-amber-600">
+                    เลือกทั้งหมด
+                </label>
+                <span class="text-xs text-gray-400">เหมือนเลือกใส่ตะกร้า — ไม่ติ๊กออเดอร์ไหน ก็ไม่ถูกรวมยอด</span>
             </div>
-            <div class="bg-green-50 border border-green-100 rounded-xl p-4 text-center">
-                <p class="text-2xl font-extrabold text-green-700" id="sales-order-count">{{ done_count }}</p>
-                <p class="text-xs text-green-500 mt-1 font-semibold">ออเดอร์ที่เลือก</p>
-            </div>
-        </div>
-        <div>
-            <h3 class="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2">🧁 สินค้าที่ขายได้ <span class="text-xs text-gray-400 font-normal">(หักส่วนลดแล้ว — เฉพาะออเดอร์ที่เลือก)</span></h3>
-            <div class="space-y-2" id="sales-product-list">
-                {% for item in product_summary %}
-                <div class="flex items-center justify-between bg-gray-50 rounded-xl px-4 py-3">
-                    <div class="flex items-center gap-2">
-                        <span class="text-base">🧁</span><span class="text-sm font-medium text-gray-800">{{ item.product_name }}</span>
-                    </div>
-                    <div class="flex items-center gap-3 text-right">
-                        <span class="text-xs text-gray-400">{{ item.total_qty }} ชิ้น</span>
-                        <span class="text-sm font-bold text-amber-700">฿{{ item.total_revenue }}</span>
-                    </div>
-                </div>
+            <div class="max-h-40 overflow-y-auto space-y-1.5 mb-4 pr-1">
+                {% for o in done_orders %}
+                <label class="flex items-center justify-between gap-2 bg-gray-50 hover:bg-gray-100 rounded-lg px-3 py-2 cursor-pointer text-sm">
+                    <span class="flex items-center gap-2 min-w-0">
+                        <input type="checkbox" class="sales-order-check w-4 h-4 accent-amber-600 shrink-0" value="{{ o.id }}" checked onchange="recalcSalesSummary()">
+                        <span class="font-semibold text-gray-700 shrink-0">#{{ o.order_number }}</span>
+                        <span class="text-gray-400 truncate">{{ o.customer_name }}</span>
+                    </span>
+                    <span class="font-bold text-amber-700 shrink-0">฿{{ o.total }}</span>
+                </label>
                 {% empty %}
-                <div class="text-center py-8 text-gray-400"><p class="text-3xl mb-2">📭</p><p class="text-sm">ยังไม่มีออเดอร์ที่เสร็จสิ้น</p></div>
+                <p class="text-center text-gray-400 text-sm py-4">ยังไม่มีออเดอร์ที่เสร็จสิ้น</p>
                 {% endfor %}
             </div>
+
+            <div class="grid grid-cols-2 gap-3 mb-5">
+                <div class="bg-amber-50 border border-amber-100 rounded-xl p-4 text-center">
+                    <p class="text-2xl font-extrabold text-amber-700" id="sales-grand-total">฿{{ sales_total|floatformat:"0" }}</p>
+                    <p class="text-xs text-amber-500 mt-1 font-semibold">ยอดขายรวม (ที่เลือก)</p>
+                </div>
+                <div class="bg-green-50 border border-green-100 rounded-xl p-4 text-center">
+                    <p class="text-2xl font-extrabold text-green-700" id="sales-order-count">{{ done_count }}</p>
+                    <p class="text-xs text-green-500 mt-1 font-semibold">ออเดอร์ที่เลือก</p>
+                </div>
+            </div>
+            <div>
+                <h3 class="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2">🧁 สินค้าที่ขายได้ <span class="text-xs text-gray-400 font-normal">(หักส่วนลดแล้ว — เฉพาะออเดอร์ที่เลือก)</span></h3>
+                <div class="space-y-2" id="sales-product-list">
+                    {% for item in product_summary %}
+                    <div class="flex items-center justify-between bg-gray-50 rounded-xl px-4 py-3">
+                        <div class="flex items-center gap-2">
+                            <span class="text-base">🧁</span><span class="text-sm font-medium text-gray-800">{{ item.product_name }}</span>
+                        </div>
+                        <div class="flex items-center gap-3 text-right">
+                            <span class="text-xs text-gray-400">{{ item.total_qty }} ชิ้น</span>
+                            <span class="text-sm font-bold text-amber-700">฿{{ item.total_revenue }}</span>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <div class="text-center py-8 text-gray-400"><p class="text-3xl mb-2">📭</p><p class="text-sm">ยังไม่มีออเดอร์ที่เสร็จสิ้น</p></div>
+                    {% endfor %}
+                </div>
+            </div>
+
         </div>
-        <button onclick="closeSalesSummary()" class="mt-5 w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-2.5 rounded-xl text-sm transition">ปิด</button>
+        <!-- /sales-export-area -->
+
+        <!-- ✅ ปุ่ม Export + ปิด -->
+        <div class="export-btn-wrap flex gap-2 mt-5">
+            <button onclick="exportToPNG('sales-export-area', 'สรุปยอดขาย')"
+                    class="flex-1 bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2.5 rounded-xl text-sm transition">
+                🖼️ บันทึกรูป
+            </button>
+            <button onclick="exportToPDF('sales-export-area', 'สรุปยอดขาย')"
+                    class="flex-1 bg-rose-500 hover:bg-rose-600 text-white font-semibold py-2.5 rounded-xl text-sm transition">
+                📄 บันทึก PDF
+            </button>
+            <button onclick="closeSalesSummary()" class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-2.5 rounded-xl text-sm transition">ปิด</button>
+        </div>
     </div>
 </div>
 
+<!-- ════════════════════════════ PURCHASE MODAL (ไม่เปลี่ยน) ════════════════════════════ -->
 <div id="purchase-modal" class="hidden fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4">
     <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
         <div class="flex items-center justify-between mb-5">
@@ -384,6 +409,7 @@
     </div>
 </div>
 
+<!-- ════════════════════════════ TODO MODAL ════════════════════════════ -->
 <div id="todo-modal" class="hidden fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4">
     <div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto">
         <div class="flex items-center justify-between mb-5">
@@ -394,37 +420,52 @@
             <button onclick="closeTodoSummary()" class="text-gray-400 hover:text-gray-600 text-xl font-bold leading-none">✕</button>
         </div>
         
-        {% if todo_summary %}
-        <div class="space-y-2">
-            {% for item in todo_summary %}
-            <div class="flex items-center justify-between bg-amber-50 border border-amber-100 rounded-xl px-4 py-3">
-                <div class="flex items-center gap-2">
-                    <span class="text-base">🧁</span><span class="text-sm font-bold text-gray-800">{{ item.product_name }}</span>
+        <!-- ✅ ส่วนที่จะถูก capture เป็น PNG/PDF -->
+        <div id="todo-export-area" class="bg-white p-2 rounded-xl">
+            <p class="text-xs text-gray-400 mb-3 text-center">📋 ยอดขนมที่ต้องทำ (รอ + ยืนยัน)</p>
+            {% if todo_summary %}
+            <div class="space-y-2">
+                {% for item in todo_summary %}
+                <div class="flex items-center justify-between bg-amber-50 border border-amber-100 rounded-xl px-4 py-3">
+                    <div class="flex items-center gap-2">
+                        <span class="text-base">🧁</span><span class="text-sm font-bold text-gray-800">{{ item.product_name }}</span>
+                    </div>
+                    <div class="text-right">
+                        <span class="text-lg font-extrabold text-amber-700">{{ item.total_qty }}</span>
+                        <span class="text-xs text-amber-600 font-semibold ml-1">ชิ้น</span>
+                    </div>
                 </div>
-                <div class="text-right">
-                    <span class="text-lg font-extrabold text-amber-700">{{ item.total_qty }}</span>
-                    <span class="text-xs text-amber-600 font-semibold ml-1">ชิ้น</span>
-                </div>
+                {% endfor %}
             </div>
-            {% endfor %}
+            {% else %}
+            <div class="text-center py-8 text-gray-400">
+                <p class="text-3xl mb-2">🙌</p>
+                <p class="text-sm">ไม่มีออเดอร์ค้างทำ</p>
+            </div>
+            {% endif %}
         </div>
-        {% else %}
-        <div class="text-center py-8 text-gray-400">
-            <p class="text-3xl mb-2">🙌</p>
-            <p class="text-sm">ไม่มีออเดอร์ค้างทำ</p>
+        <!-- /todo-export-area -->
+
+        <!-- ✅ ปุ่ม Export + ปิด -->
+        <div class="export-btn-wrap flex gap-2 mt-5">
+            <button onclick="exportToPNG('todo-export-area', 'ยอดต้องทำ')"
+                    class="flex-1 bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2.5 rounded-xl text-sm transition">
+                🖼️ บันทึกรูป
+            </button>
+            <button onclick="exportToPDF('todo-export-area', 'ยอดต้องทำ')"
+                    class="flex-1 bg-rose-500 hover:bg-rose-600 text-white font-semibold py-2.5 rounded-xl text-sm transition">
+                📄 บันทึก PDF
+            </button>
+            <button onclick="closeTodoSummary()" class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-2.5 rounded-xl text-sm transition">ปิด</button>
         </div>
-        {% endif %}
-        
-        <button onclick="closeTodoSummary()" class="mt-5 w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-2.5 rounded-xl text-sm transition">ปิด</button>
     </div>
 </div>
 
+<!-- ════════════ Modals เดิม (ไม่เปลี่ยน) ════════════ -->
 <div id="modal" class="hidden fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4">
     <div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 max-h-[95vh] flex flex-col">
         <h2 id="modal-title" class="text-lg font-bold text-gray-800 mb-4 shrink-0">เพิ่มสินค้า</h2>
-        
         <div class="overflow-y-auto flex-1 pr-2 space-y-3 pb-4">
-            
             <div id="img-preview-wrap" class="hidden mb-2">
                 <img id="img-preview" class="w-full h-40 object-cover rounded-xl">
             </div>
@@ -435,13 +476,10 @@
                 <input type="file" accept="image/*" id="prod-img-file" class="hidden" onchange="previewImage(event)">
             </label>
             <input type="hidden" id="prod-id">
-            
             <input type="text" id="prod-name" placeholder="ชื่อสินค้า *" class="w-full border rounded-xl px-3.5 py-2 text-sm focus:ring-2 focus:ring-amber-400 focus:outline-none">
             <input type="hidden" id="prod-price" value="0">
             <textarea id="prod-desc" placeholder="รายละเอียด (ไม่บังคับ)" rows="2" class="w-full border rounded-xl px-3.5 py-2 text-sm focus:ring-2 focus:ring-amber-400 focus:outline-none"></textarea>
-
             <hr class="my-4 border-gray-100">
-
             <div>
                 <div class="flex items-center justify-between mb-3">
                     <label class="font-bold text-gray-700 text-sm">🍡 ตัวเลือกสินค้า (SKU)</label>
@@ -449,9 +487,7 @@
                 </div>
                 <div id="skus-container" class="space-y-2"></div>
             </div>
-
             <hr class="my-4 border-gray-100">
-
             <div>
                 <div class="flex items-center justify-between mb-3">
                     <label class="font-bold text-gray-700 text-sm">✨ โปรโมชั่น</label>
@@ -459,9 +495,7 @@
                 </div>
                 <div id="promos-container" class="space-y-2"></div>
             </div>
-
             <hr class="my-4 border-gray-100">
-
             <div>
                 <div class="flex items-center justify-between mb-3">
                     <label class="font-bold text-gray-700 text-sm">🧾 วัตถุดิบ/อุปกรณ์/แพ็คเกจจิ้ง</label>
@@ -470,8 +504,7 @@
                 <p class="text-xs text-gray-400 mb-2">ใส่ทุกอย่างที่ใช้ทำเมนูนี้ "ต่อ 1 ชิ้น" ตั้งแต่วัตถุดิบยันแพ็คเกจจิ้ง ระบบจะช่วยรวมยอดที่ต้องซื้อให้อัตโนมัติตอนมีออเดอร์เข้ามา</p>
                 <div id="ingredients-container" class="space-y-2"></div>
             </div>
-            
-        </div> 
+        </div>
         <div class="flex gap-3 pt-4 border-t mt-auto shrink-0">
             <button onclick="saveProduct()" class="flex-1 bg-amber-600 hover:bg-amber-700 text-white font-semibold py-2.5 rounded-xl text-sm transition shadow-md">บันทึก</button>
             <button onclick="closeModal()" class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-2.5 rounded-xl text-sm transition">ยกเลิก</button>
@@ -525,6 +558,64 @@
 const csrfToken = '{{ csrf_token }}';
 const doneOrdersData = {{ done_orders_json|safe }};
 
+/* ════════════════ EXPORT FUNCTIONS ════════════════ */
+async function exportToPNG(elementId, filename) {
+    const el = document.getElementById(elementId);
+    const btnWrap = el.closest('.bg-white, .rounded-2xl').querySelector('.export-btn-wrap');
+    if (btnWrap) btnWrap.style.display = 'none';
+    try {
+        const canvas = await html2canvas(el, {
+            scale: 2,
+            useCORS: true,
+            backgroundColor: '#ffffff',
+            logging: false,
+        });
+        const link = document.createElement('a');
+        link.download = filename + '.png';
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+    } catch(e) {
+        alert('บันทึกรูปไม่สำเร็จ: ' + e.message);
+    } finally {
+        if (btnWrap) btnWrap.style.display = '';
+    }
+}
+
+async function exportToPDF(elementId, filename) {
+    const el = document.getElementById(elementId);
+    const btnWrap = el.closest('.bg-white, .rounded-2xl').querySelector('.export-btn-wrap');
+    if (btnWrap) btnWrap.style.display = 'none';
+    try {
+        const canvas = await html2canvas(el, {
+            scale: 2,
+            useCORS: true,
+            backgroundColor: '#ffffff',
+            logging: false,
+        });
+        const { jsPDF } = window.jspdf;
+        const imgData = canvas.toDataURL('image/png');
+        const pxW = canvas.width;
+        const pxH = canvas.height;
+        const mmW = 210; // A4
+        const mmH = Math.round((pxH / pxW) * mmW);
+        const orientation = mmH > 297 ? 'portrait' : 'portrait';
+        const pdf = new jsPDF({ orientation, unit: 'mm', format: 'a4' });
+        const pageH = pdf.internal.pageSize.getHeight();
+        let offset = 0;
+        while (offset < mmH) {
+            if (offset > 0) pdf.addPage();
+            pdf.addImage(imgData, 'PNG', 0, -offset, mmW, mmH);
+            offset += pageH;
+        }
+        pdf.save(filename + '.pdf');
+    } catch(e) {
+        alert('บันทึก PDF ไม่สำเร็จ: ' + e.message);
+    } finally {
+        if (btnWrap) btnWrap.style.display = '';
+    }
+}
+
+/* ════════════════ MODAL FUNCTIONS ════════════════ */
 function openSalesSummary() { document.getElementById('sales-modal').classList.remove('hidden'); }
 function closeSalesSummary() { document.getElementById('sales-modal').classList.add('hidden'); }
 function openTodoSummary() { document.getElementById('todo-modal').classList.remove('hidden'); }
@@ -532,7 +623,6 @@ function closeTodoSummary() { document.getElementById('todo-modal').classList.ad
 function openPurchaseList() { document.getElementById('purchase-modal').classList.remove('hidden'); }
 function closePurchaseList() { document.getElementById('purchase-modal').classList.add('hidden'); }
 
-/* ─── สรุปยอดขาย: ติ๊กเลือกออเดอร์ที่ต้องการรวมยอด (เหมือนเลือกของในตะกร้า) ─── */
 function toggleSelectAllSales(checkboxEl) {
     document.querySelectorAll('.sales-order-check').forEach(cb => cb.checked = checkboxEl.checked);
     recalcSalesSummary();
@@ -551,9 +641,6 @@ function recalcSalesSummary() {
         if (!checkedIds.includes(o.id)) return;
         orderCount++;
         grandTotal += o.total;
-
-        // ✅ กระจายส่วนลดรวมของออเดอร์ตามสัดส่วนราคาของแต่ละรายการ
-        // เพื่อให้ยอดต่อเมนูบวกกันแล้ว "ตรงกับยอดสุทธิของออเดอร์เป๊ะ" ไม่เกินยอดจริงเหมือนเดิม
         const rawSum = o.items.reduce((s, it) => s + it.price * it.qty, 0);
         o.items.forEach(it => {
             const raw = it.price * it.qty;
@@ -585,7 +672,6 @@ function recalcSalesSummary() {
     }
 }
 
-/* ─── วิธีชำระเงิน (เงินสด/โอน) ต่อออเดอร์ ─── */
 async function updatePaymentMethod(orderId, method) {
     const formData = new FormData();
     formData.append('payment_method', method);
@@ -593,15 +679,9 @@ async function updatePaymentMethod(orderId, method) {
     const data = await res.json();
     if (data.success) {
         const sel = document.getElementById('pay-method-select-' + orderId);
-        const colorMap = {
-            '':         'bg-gray-50 text-gray-400 border-gray-200',
-            cash:       'bg-emerald-50 text-emerald-700 border-emerald-200',
-            transfer:   'bg-sky-50 text-sky-700 border-sky-200',
-        };
+        const colorMap = { '': 'bg-gray-50 text-gray-400 border-gray-200', cash: 'bg-emerald-50 text-emerald-700 border-emerald-200', transfer: 'bg-sky-50 text-sky-700 border-sky-200' };
         sel.className = 'text-xs border rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-400 ' + colorMap[method];
-    } else {
-        alert('เกิดข้อผิดพลาดในการบันทึกวิธีชำระเงิน');
-    }
+    } else { alert('เกิดข้อผิดพลาดในการบันทึกวิธีชำระเงิน'); }
 }
 
 function switchTab(name) {
@@ -619,14 +699,12 @@ function filterOrders(status) {
 }
 
 async function updateOrderStatus(orderId, status) {
-    // ✅ ดักจับถ้าเลือก 'ยกเลิกแล้ว' จาก Dropdown ให้เปิด Modal พิมพ์เหตุผล
     if (status === 'cancelled') {
         openCancelModal(orderId);
         const sel = document.getElementById('status-select-' + orderId);
-        sel.value = document.getElementById('order-card-' + orderId).dataset.status; 
+        sel.value = document.getElementById('order-card-' + orderId).dataset.status;
         return;
     }
-
     const formData = new FormData();
     formData.append('status', status);
     const res = await fetch(`/admin-panel/order/${orderId}/status/`, { method: 'POST', headers: { 'X-CSRFToken': csrfToken }, body: formData });
@@ -635,46 +713,27 @@ async function updateOrderStatus(orderId, status) {
         document.getElementById('order-card-' + orderId).dataset.status = status;
         const sel = document.getElementById('status-select-' + orderId);
         sel.className = sel.className.replace(/bg-\w+-50 text-\w+-700 border-\w+-200/g, '');
-        const colorMap = {
-            pending:   'bg-yellow-50 text-yellow-700 border-yellow-200',
-            confirmed: 'bg-blue-50 text-blue-700 border-blue-200',
-            done:      'bg-green-50 text-green-700 border-green-200',
-            cancelled: 'bg-red-50 text-red-700 border-red-200',
-        };
+        const colorMap = { pending: 'bg-yellow-50 text-yellow-700 border-yellow-200', confirmed: 'bg-blue-50 text-blue-700 border-blue-200', done: 'bg-green-50 text-green-700 border-green-200', cancelled: 'bg-red-50 text-red-700 border-red-200' };
         sel.classList.add(...colorMap[status].split(' '));
     }
 }
 
-/* ─── Cancel Order Modal ─── */
 function openCancelModal(id) {
     document.getElementById('cancel-order-id').value = id;
     document.getElementById('cancel-reason').value = '';
     document.getElementById('cancel-modal').classList.remove('hidden');
 }
-
-function closeCancelModal() {
-    document.getElementById('cancel-modal').classList.add('hidden');
-}
+function closeCancelModal() { document.getElementById('cancel-modal').classList.add('hidden'); }
 
 async function confirmCancelOrder() {
     const id = document.getElementById('cancel-order-id').value;
     const reason = document.getElementById('cancel-reason').value.trim();
-    if (!reason) return alert('กรุณาระบุเหตุผลที่ยกเลิกออเดอร์ (เช่น ลูกค้าไม่โอนเงิน, ของหมด)');
-    
+    if (!reason) return alert('กรุณาระบุเหตุผลที่ยกเลิกออเดอร์');
     const formData = new FormData();
     formData.append('cancel_reason', reason);
-
-    const res = await fetch(`/admin-panel/order/${id}/cancel/`, { 
-        method: 'POST', 
-        headers: { 'X-CSRFToken': csrfToken }, 
-        body: formData 
-    });
+    const res = await fetch(`/admin-panel/order/${id}/cancel/`, { method: 'POST', headers: { 'X-CSRFToken': csrfToken }, body: formData });
     const data = await res.json();
-    if (data.success) {
-        location.reload(); 
-    } else {
-        alert('เกิดข้อผิดพลาดในการยกเลิกออเดอร์');
-    }
+    if (data.success) { location.reload(); } else { alert('เกิดข้อผิดพลาดในการยกเลิกออเดอร์'); }
 }
 
 function openEditOrderModal(id, name, phone, address, date, note) {
@@ -686,10 +745,7 @@ function openEditOrderModal(id, name, phone, address, date, note) {
     document.getElementById('edit-order-note').value = (note && note !== 'None') ? note : '';
     document.getElementById('edit-order-modal').classList.remove('hidden');
 }
-
-function closeEditOrderModal() {
-    document.getElementById('edit-order-modal').classList.add('hidden');
-}
+function closeEditOrderModal() { document.getElementById('edit-order-modal').classList.add('hidden'); }
 
 async function saveEditOrder() {
     const id = document.getElementById('edit-order-id').value;
@@ -699,18 +755,9 @@ async function saveEditOrder() {
     formData.append('address', document.getElementById('edit-order-address').value);
     formData.append('appointment_date', document.getElementById('edit-order-date').value);
     formData.append('note', document.getElementById('edit-order-note').value);
-
-    const res = await fetch(`/admin-panel/order/${id}/update-customer/`, { 
-        method: 'POST', 
-        headers: { 'X-CSRFToken': csrfToken }, 
-        body: formData 
-    });
+    const res = await fetch(`/admin-panel/order/${id}/update-customer/`, { method: 'POST', headers: { 'X-CSRFToken': csrfToken }, body: formData });
     const data = await res.json();
-    if (data.success) {
-        location.reload(); 
-    } else {
-        alert('เกิดข้อผิดพลาดในการบันทึก');
-    }
+    if (data.success) { location.reload(); } else { alert('เกิดข้อผิดพลาดในการบันทึก'); }
 }
 
 function openSlipModal(url) { document.getElementById('slip-modal-img').src = url; document.getElementById('slip-modal').classList.remove('hidden'); }
@@ -720,15 +767,10 @@ function addSkuRow(id = '', name = '', price = '', imageUrl = '') {
     const container = document.getElementById('skus-container');
     const row = document.createElement('div');
     row.className = 'flex gap-2 sku-row items-center';
-    row.dataset.id = id; 
-
-    let imgHtml = '';
-    if (imageUrl) {
-        imgHtml = `<img src="${imageUrl}" class="w-9 h-9 rounded object-cover border sku-preview">`;
-    } else {
-        imgHtml = `<div class="w-9 h-9 rounded bg-amber-50 border border-amber-200 flex items-center justify-center text-[10px] text-amber-600 font-bold sku-preview hover:bg-amber-100 transition shadow-sm">รูป</div>`;
-    }
-
+    row.dataset.id = id;
+    let imgHtml = imageUrl
+        ? `<img src="${imageUrl}" class="w-9 h-9 rounded object-cover border sku-preview">`
+        : `<div class="w-9 h-9 rounded bg-amber-50 border border-amber-200 flex items-center justify-center text-[10px] text-amber-600 font-bold sku-preview hover:bg-amber-100 transition shadow-sm">รูป</div>`;
     row.innerHTML = `
         <label class="cursor-pointer shrink-0" title="คลิกเพื่ออัปโหลดรูป SKU">
             ${imgHtml}
@@ -747,9 +789,8 @@ function previewSkuImage(event, inputEl) {
         const reader = new FileReader();
         reader.onload = e => {
             const previewEl = inputEl.parentElement.querySelector('.sku-preview');
-            if (previewEl.tagName === 'IMG') {
-                previewEl.src = e.target.result;
-            } else {
+            if (previewEl.tagName === 'IMG') { previewEl.src = e.target.result; }
+            else {
                 const img = document.createElement('img');
                 img.src = e.target.result;
                 img.className = 'w-9 h-9 rounded object-cover border sku-preview shadow-sm';
@@ -764,17 +805,15 @@ function addPromoRow(qty = '', promoType = 'special_price', price = '', discount
     const container = document.getElementById('promos-container');
     const row = document.createElement('div');
     row.className = 'flex flex-wrap gap-2 promo-row items-center bg-gray-50 p-2 rounded-lg';
-
-    const priceDisplay    = promoType === 'special_price' ? '' : 'hidden';
-    const discountDisplay = promoType === 'discount'      ? '' : 'hidden';
-
+    const priceDisplay = promoType === 'special_price' ? '' : 'hidden';
+    const discountDisplay = promoType === 'discount' ? '' : 'hidden';
     row.innerHTML = `
         <span class="text-xs text-gray-500 whitespace-nowrap">ซื้อครบ</span>
         <input type="number" placeholder="ชิ้น" value="${qty}" min="1" class="promo-qty w-14 border rounded px-1 text-center text-sm">
         <span class="text-xs text-gray-500">ชิ้น</span>
         <select class="promo-type border rounded px-1 text-xs text-gray-700 bg-white" onchange="togglePromoInputs(this)">
             <option value="special_price" ${promoType==='special_price'?'selected':''}>ราคาพิเศษ/ชิ้น</option>
-            <option value="discount"      ${promoType==='discount'     ?'selected':''}>ส่วนลดรวม (฿)</option>
+            <option value="discount" ${promoType==='discount'?'selected':''}>ส่วนลดรวม (฿)</option>
         </select>
         <input type="number" placeholder="ราคา/ชิ้น (฿)" value="${price}" min="0" class="promo-price w-24 border rounded px-1 text-center text-sm ${priceDisplay}">
         <input type="number" placeholder="ลด (฿)" value="${discount}" min="0" class="promo-discount w-24 border rounded px-1 text-center text-sm ${discountDisplay}">
@@ -785,17 +824,10 @@ function addPromoRow(qty = '', promoType = 'special_price', price = '', discount
 
 function togglePromoInputs(selectEl) {
     const row = selectEl.closest('.promo-row');
-    const priceInput    = row.querySelector('.promo-price');
+    const priceInput = row.querySelector('.promo-price');
     const discountInput = row.querySelector('.promo-discount');
-    if (selectEl.value === 'special_price') {
-        priceInput.classList.remove('hidden');
-        discountInput.classList.add('hidden');
-        discountInput.value = '';
-    } else {
-        discountInput.classList.remove('hidden');
-        priceInput.classList.add('hidden');
-        priceInput.value = '';
-    }
+    if (selectEl.value === 'special_price') { priceInput.classList.remove('hidden'); discountInput.classList.add('hidden'); discountInput.value = ''; }
+    else { discountInput.classList.remove('hidden'); priceInput.classList.add('hidden'); priceInput.value = ''; }
 }
 
 function addIngredientRow(name = '', qty = '', unit = '') {
@@ -814,8 +846,8 @@ function addIngredientRow(name = '', qty = '', unit = '') {
 function openModal(title = 'เพิ่มสินค้า') {
     document.getElementById('modal-title').textContent = title;
     document.getElementById('modal').classList.remove('hidden');
-    if(title === 'เพิ่มสินค้า') {
-        if(document.getElementById('skus-container').children.length === 0) { addSkuRow('', 'ปกติ', '', ''); }
+    if (title === 'เพิ่มสินค้า') {
+        if (document.getElementById('skus-container').children.length === 0) { addSkuRow('', 'ปกติ', '', ''); }
     }
 }
 
@@ -843,141 +875,92 @@ function previewImage(event) {
 
 async function saveProduct() {
     const id = document.getElementById('prod-id').value;
-
-    // ✅ Validate ชื่อสินค้าก่อน
     const productName = document.getElementById('prod-name').value.trim();
-    if (!productName) {
-        alert('กรุณากรอกชื่อสินค้า');
-        document.getElementById('prod-name').focus();
-        return;
-    }
-
+    if (!productName) { alert('กรุณากรอกชื่อสินค้า'); document.getElementById('prod-name').focus(); return; }
     const formData = new FormData();
     formData.append('name', productName);
     formData.append('description', document.getElementById('prod-desc').value);
     const imgFile = document.getElementById('prod-img-file').files[0];
     if (imgFile) formData.append('image', imgFile);
-
     const skus = [];
-    // ✅ ใช้ price !== '' แทน truthy check เพื่อรองรับราคา 0
     Array.from(document.querySelectorAll('.sku-row')).forEach((row, index) => {
         const name = row.querySelector('.sku-name').value.trim();
         const price = row.querySelector('.sku-price').value.trim();
         const skuId = row.dataset.id;
-        
         if (name && price !== '') {
             skus.push({ id: skuId, name: name, price: price, originalIndex: index });
             const fileInput = row.querySelector('.sku-image-input');
-            if (fileInput && fileInput.files.length > 0) {
-                formData.append(`sku_image_${index}`, fileInput.files[0]);
-            }
+            if (fileInput && fileInput.files.length > 0) { formData.append(`sku_image_${index}`, fileInput.files[0]); }
         }
     });
-
-    // ✅ ต้องมีอย่างน้อย 1 SKU
-    if (skus.length === 0) {
-        alert('กรุณาเพิ่มตัวเลือกสินค้า (SKU) อย่างน้อย 1 รายการ พร้อมกรอกชื่อและราคา');
-        return;
-    }
-
+    if (skus.length === 0) { alert('กรุณาเพิ่มตัวเลือกสินค้า (SKU) อย่างน้อย 1 รายการ พร้อมกรอกชื่อและราคา'); return; }
     const promos = Array.from(document.querySelectorAll('.promo-row')).map(row => {
-        const qty       = row.querySelector('.promo-qty').value;
-        const ptype     = row.querySelector('.promo-type').value;
-        const price     = row.querySelector('.promo-price').value;
-        const discount  = row.querySelector('.promo-discount').value;
+        const qty = row.querySelector('.promo-qty').value;
+        const ptype = row.querySelector('.promo-type').value;
+        const price = row.querySelector('.promo-price').value;
+        const discount = row.querySelector('.promo-discount').value;
         return { min_quantity: qty, promo_type: ptype, special_price: price || null, discount: discount || null };
     }).filter(p => p.min_quantity && (p.special_price || p.discount));
-
     const ingredients = Array.from(document.querySelectorAll('.ingredient-row')).map(row => {
         const name = row.querySelector('.ingredient-name').value.trim();
-        const qty  = row.querySelector('.ingredient-qty').value.trim();
+        const qty = row.querySelector('.ingredient-qty').value.trim();
         const unit = row.querySelector('.ingredient-unit').value.trim();
         return { name: name, quantity: qty || 1, unit: unit };
     }).filter(i => i.name);
-
     formData.append('skus', JSON.stringify(skus));
     formData.append('promos', JSON.stringify(promos));
     formData.append('ingredients', JSON.stringify(ingredients));
-
     const url = id ? `/admin-panel/edit/${id}/` : '/admin-panel/add/';
     const res = await fetch(url, { method: 'POST', headers: { 'X-CSRFToken': csrfToken }, body: formData });
     const data = await res.json();
     if (data.success) { closeModal(); location.reload(); }
     else {
-        // ✅ แสดง error จาก Django form validation ให้ชัดขึ้น
-        if (data.errors) {
-            const msgs = Object.entries(data.errors).map(([f, e]) => `${f}: ${e}`).join('\n');
-            alert('ข้อมูลไม่ถูกต้อง:\n' + msgs);
-        } else {
-            alert('เกิดข้อผิดพลาด: ' + (data.error || 'ไม่ทราบสาเหตุ'));
-        }
+        if (data.errors) { const msgs = Object.entries(data.errors).map(([f, e]) => `${f}: ${e}`).join('\n'); alert('ข้อมูลไม่ถูกต้อง:\n' + msgs); }
+        else { alert('เกิดข้อผิดพลาด: ' + (data.error || 'ไม่ทราบสาเหตุ')); }
     }
 }
-
 
 async function editProduct(id) {
     const res = await fetch(`/admin-panel/edit/${id}/`);
     const data = await res.json();
-    
     document.getElementById('prod-id').value = data.id;
     document.getElementById('prod-name').value = data.name;
     document.getElementById('prod-price').value = data.price;
     document.getElementById('prod-desc').value = data.description;
-    if (data.image_url) {
-        document.getElementById('img-preview').src = data.image_url;
-        document.getElementById('img-preview-wrap').classList.remove('hidden');
-    }
-
+    if (data.image_url) { document.getElementById('img-preview').src = data.image_url; document.getElementById('img-preview-wrap').classList.remove('hidden'); }
     document.getElementById('skus-container').innerHTML = '';
-    if(data.skus && data.skus.length > 0) {
-        data.skus.forEach(s => addSkuRow(s.id, s.name, s.price, s.image_url));
-    } else {
-        addSkuRow('', 'ปกติ', data.price, '');
-    }
-
+    if (data.skus && data.skus.length > 0) { data.skus.forEach(s => addSkuRow(s.id, s.name, s.price, s.image_url)); }
+    else { addSkuRow('', 'ปกติ', data.price, ''); }
     document.getElementById('promos-container').innerHTML = '';
-    if(data.promos && data.promos.length > 0) {
-        data.promos.forEach(p => addPromoRow(p.min_quantity, p.promo_type || 'special_price', p.special_price || '', p.discount || ''));
-    }
-
+    if (data.promos && data.promos.length > 0) { data.promos.forEach(p => addPromoRow(p.min_quantity, p.promo_type || 'special_price', p.special_price || '', p.discount || '')); }
     document.getElementById('ingredients-container').innerHTML = '';
-    if(data.ingredients && data.ingredients.length > 0) {
-        data.ingredients.forEach(i => addIngredientRow(i.name, i.quantity, i.unit));
-    }
-
+    if (data.ingredients && data.ingredients.length > 0) { data.ingredients.forEach(i => addIngredientRow(i.name, i.quantity, i.unit)); }
     openModal('แก้ไขสินค้า');
 }
+
 async function deleteProduct(id) {
     if (!confirm('ลบสินค้านี้?')) return;
     const res = await fetch(`/admin-panel/delete/${id}/`, { method: 'POST', headers: { 'X-CSRFToken': csrfToken } });
     const data = await res.json();
     if (data.success) document.getElementById(`row-${id}`).remove();
 }
+
 async function toggleProduct(id) {
     const res = await fetch(`/admin-panel/toggle/${id}/`, { method: 'POST', headers: { 'X-CSRFToken': csrfToken } });
     const data = await res.json();
     const btn = document.getElementById(`toggle-${id}`);
-    if (data.is_available) {
-        btn.textContent = 'เปิดขาย';
-        btn.className = 'px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700';
-    } else {
-        btn.textContent = 'ปิดขาย';
-        btn.className = 'px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-500';
-    }
+    if (data.is_available) { btn.textContent = 'เปิดขาย'; btn.className = 'px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700'; }
+    else { btn.textContent = 'ปิดขาย'; btn.className = 'px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-500'; }
 }
 
 function previewNewQR(event) {
     const file = event.target.files[0];
     if (file) {
         const reader = new FileReader();
-        reader.onload = e => {
-            document.getElementById('new-qr-img').src = e.target.result;
-            document.getElementById('new-qr-preview').classList.remove('hidden');
-        };
+        reader.onload = e => { document.getElementById('new-qr-img').src = e.target.result; document.getElementById('new-qr-preview').classList.remove('hidden'); };
         reader.readAsDataURL(file);
     }
 }
-// เอาไปวางทับ savePayment และ deleteQR อันเก่าด้านล่างสุดของ admin.html นะครับ
 
 async function savePayment() {
     try {
@@ -987,18 +970,8 @@ async function savePayment() {
         formData.append('account_name', document.getElementById('pay-name').value.trim());
         const qrFile = document.getElementById('pay-qr-file').files[0];
         if (qrFile) formData.append('qr_image', qrFile);
-
-        const res = await fetch('/admin-panel/payment/update/', { 
-            method: 'POST', 
-            headers: { 'X-CSRFToken': csrfToken }, 
-            body: formData 
-        });
-
-        if (!res.ok) {
-            alert(`ไม่สามารถบันทึกได้ ระบบหลังบ้านแจ้ง Error รหัส: ${res.status}`);
-            return;
-        }
-
+        const res = await fetch('/admin-panel/payment/update/', { method: 'POST', headers: { 'X-CSRFToken': csrfToken }, body: formData });
+        if (!res.ok) { alert(`ไม่สามารถบันทึกได้ ระบบหลังบ้านแจ้ง Error รหัส: ${res.status}`); return; }
         const data = await res.json();
         if (data.success) {
             const msg = document.getElementById('pay-msg');
@@ -1006,62 +979,30 @@ async function savePayment() {
             setTimeout(() => msg.classList.add('hidden'), 3000);
             if (qrFile) location.reload();
         }
-    } catch (error) {
-        alert("เกิดข้อผิดพลาดทางระบบ (JS): " + error.message);
-    }
+    } catch (error) { alert("เกิดข้อผิดพลาดทางระบบ (JS): " + error.message); }
 }
 
 async function deleteQR() {
     if (!confirm('ลบ QR Code นี้?')) return;
     try {
-        const res = await fetch('/admin-panel/payment/delete-qr/', { 
-            method: 'POST', 
-            headers: { 'X-CSRFToken': csrfToken } 
-        });
-
-        if (!res.ok) {
-            alert(`ไม่สามารถลบได้ ระบบหลังบ้านแจ้ง Error รหัส: ${res.status}`);
-            return;
-        }
-
+        const res = await fetch('/admin-panel/payment/delete-qr/', { method: 'POST', headers: { 'X-CSRFToken': csrfToken } });
+        if (!res.ok) { alert(`ไม่สามารถลบได้ ระบบหลังบ้านแจ้ง Error รหัส: ${res.status}`); return; }
         const data = await res.json();
         if (data.success) {
             document.getElementById('qr-preview-wrap').classList.add('hidden');
             document.getElementById('qr-preview-img').src = '';
             alert('ลบรูปภาพ QR สำเร็จเรียบร้อยแล้วครับ');
         }
-    } catch (error) {
-        alert("เกิดข้อผิดพลาดทางระบบ (JS): " + error.message);
-    }
-}
-    
-async function deleteQR() {
-    if (!confirm('ลบ QR Code นี้?')) return;
-    const res = await fetch('/admin-panel/payment/delete-qr/', { method: 'POST', headers: { 'X-CSRFToken': csrfToken } });
-    const data = await res.json();
-    if (data.success) {
-        document.getElementById('qr-preview-wrap').classList.add('hidden');
-        document.getElementById('qr-preview-img').src = '';
-    }
+    } catch (error) { alert("เกิดข้อผิดพลาดทางระบบ (JS): " + error.message); }
 }
 
-/* ─── Delete Order (ลบออเดอร์ถาวร) ─── */
 async function deleteOrder(id) {
     if (!confirm('⚠️ ยืนยันการลบออเดอร์นี้อย่างถาวร? \n(ข้อมูลและรูปสลิปจะถูกลบทิ้งเพื่อคืนพื้นที่ และไม่สามารถกู้คืนได้)')) return;
-    
-    const res = await fetch(`/admin-panel/order/${id}/delete/`, { 
-        method: 'POST', 
-        headers: { 'X-CSRFToken': csrfToken } 
-    });
-    
+    const res = await fetch(`/admin-panel/order/${id}/delete/`, { method: 'POST', headers: { 'X-CSRFToken': csrfToken } });
     if (res.ok) {
         const data = await res.json();
-        if (data.success) {
-            document.getElementById('order-card-' + id).remove();
-        }
-    } else {
-        alert('ไม่สามารถลบออเดอร์ได้ กรุณาตรวจสอบการตั้งค่า URL');
-    }
+        if (data.success) { document.getElementById('order-card-' + id).remove(); }
+    } else { alert('ไม่สามารถลบออเดอร์ได้ กรุณาตรวจสอบการตั้งค่า URL'); }
 }
 </script>
 {% endblock %}
