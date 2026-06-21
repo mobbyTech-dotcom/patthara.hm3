@@ -119,6 +119,10 @@
                     class="ml-auto px-4 py-1.5 rounded-full text-sm font-semibold transition bg-blue-600 text-white hover:bg-blue-700 flex items-center gap-1.5 mr-2">
                 📋 ยอดต้องทำ
             </button>
+            <button onclick="openPurchaseList()"
+                    class="px-4 py-1.5 rounded-full text-sm font-semibold transition bg-emerald-600 text-white hover:bg-emerald-700 flex items-center gap-1.5 mr-2">
+                🧾 รายการที่ต้องซื้อ
+            </button>
             <button onclick="openSalesSummary()"
                     class="px-4 py-1.5 rounded-full text-sm font-semibold transition bg-amber-600 text-white hover:bg-amber-700 flex items-center gap-1.5">
                 📊 สรุปยอดขาย
@@ -151,6 +155,16 @@
                         {% endif %}
                     </div>
                     <div class="flex items-center gap-2">
+                        <select onchange="updatePaymentMethod({{ order.id }}, this.value)"
+                                id="pay-method-select-{{ order.id }}"
+                                class="text-xs border rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-400
+                                {% if order.payment_method == 'cash' %}bg-emerald-50 text-emerald-700 border-emerald-200
+                                {% elif order.payment_method == 'transfer' %}bg-sky-50 text-sky-700 border-sky-200
+                                {% else %}bg-gray-50 text-gray-400 border-gray-200{% endif %}">
+                            <option value=""         {% if not order.payment_method %}selected{% endif %}>💳 วิธีชำระเงิน</option>
+                            <option value="cash"     {% if order.payment_method == 'cash' %}selected{% endif %}>💵 เงินสด</option>
+                            <option value="transfer" {% if order.payment_method == 'transfer' %}selected{% endif %}>🏦 โอนเงิน</option>
+                        </select>
                         <select onchange="updateOrderStatus({{ order.id }}, this.value)"
                                 id="status-select-{{ order.id }}"
                                 class="text-xs border rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-400
@@ -258,24 +272,46 @@
         <div class="flex items-center justify-between mb-5">
             <div>
                 <h2 class="text-lg font-bold text-gray-800">📊 สรุปยอดขาย</h2>
-                <p class="text-xs text-gray-400 mt-0.5">เฉพาะออเดอร์ที่ <span class="text-green-600 font-semibold">เสร็จสิ้น</span> แล้ว</p>
+                <p class="text-xs text-gray-400 mt-0.5">เฉพาะออเดอร์ที่ <span class="text-green-600 font-semibold">เสร็จสิ้น</span> แล้ว — ติ๊กเลือกออเดอร์ที่ต้องการรวมยอด</p>
             </div>
             <button onclick="closeSalesSummary()" class="text-gray-400 hover:text-gray-600 text-xl font-bold leading-none">✕</button>
         </div>
+
+        <div class="flex items-center justify-between mb-2 pb-2 border-b">
+            <label class="flex items-center gap-2 text-sm font-semibold text-gray-700 cursor-pointer">
+                <input type="checkbox" id="sales-select-all" checked onchange="toggleSelectAllSales(this)" class="w-4 h-4 accent-amber-600">
+                เลือกทั้งหมด
+            </label>
+            <span class="text-xs text-gray-400">เหมือนเลือกใส่ตะกร้า — ไม่ติ๊กออเดอร์ไหน ก็ไม่ถูกรวมยอด</span>
+        </div>
+        <div class="max-h-40 overflow-y-auto space-y-1.5 mb-4 pr-1">
+            {% for o in done_orders %}
+            <label class="flex items-center justify-between gap-2 bg-gray-50 hover:bg-gray-100 rounded-lg px-3 py-2 cursor-pointer text-sm">
+                <span class="flex items-center gap-2 min-w-0">
+                    <input type="checkbox" class="sales-order-check w-4 h-4 accent-amber-600 shrink-0" value="{{ o.id }}" checked onchange="recalcSalesSummary()">
+                    <span class="font-semibold text-gray-700 shrink-0">#{{ o.order_number }}</span>
+                    <span class="text-gray-400 truncate">{{ o.customer_name }}</span>
+                </span>
+                <span class="font-bold text-amber-700 shrink-0">฿{{ o.total }}</span>
+            </label>
+            {% empty %}
+            <p class="text-center text-gray-400 text-sm py-4">ยังไม่มีออเดอร์ที่เสร็จสิ้น</p>
+            {% endfor %}
+        </div>
+
         <div class="grid grid-cols-2 gap-3 mb-5">
             <div class="bg-amber-50 border border-amber-100 rounded-xl p-4 text-center">
-                <p class="text-2xl font-extrabold text-amber-700">฿{{ sales_total|floatformat:"0" }}</p>
-                <p class="text-xs text-amber-500 mt-1 font-semibold">ยอดขายรวมทั้งหมด</p>
+                <p class="text-2xl font-extrabold text-amber-700" id="sales-grand-total">฿{{ sales_total|floatformat:"0" }}</p>
+                <p class="text-xs text-amber-500 mt-1 font-semibold">ยอดขายรวม (ที่เลือก)</p>
             </div>
             <div class="bg-green-50 border border-green-100 rounded-xl p-4 text-center">
-                <p class="text-2xl font-extrabold text-green-700">{{ done_count }}</p>
-                <p class="text-xs text-green-500 mt-1 font-semibold">ออเดอร์ที่เสร็จสิ้น</p>
+                <p class="text-2xl font-extrabold text-green-700" id="sales-order-count">{{ done_count }}</p>
+                <p class="text-xs text-green-500 mt-1 font-semibold">ออเดอร์ที่เลือก</p>
             </div>
         </div>
-        {% if product_summary %}
         <div>
-            <h3 class="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2">🧁 สินค้าที่ขายได้ <span class="text-xs text-gray-400 font-normal">(รวมทุกออเดอร์)</span></h3>
-            <div class="space-y-2">
+            <h3 class="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2">🧁 สินค้าที่ขายได้ <span class="text-xs text-gray-400 font-normal">(หักส่วนลดแล้ว — เฉพาะออเดอร์ที่เลือก)</span></h3>
+            <div class="space-y-2" id="sales-product-list">
                 {% for item in product_summary %}
                 <div class="flex items-center justify-between bg-gray-50 rounded-xl px-4 py-3">
                     <div class="flex items-center gap-2">
@@ -286,13 +322,65 @@
                         <span class="text-sm font-bold text-amber-700">฿{{ item.total_revenue }}</span>
                     </div>
                 </div>
+                {% empty %}
+                <div class="text-center py-8 text-gray-400"><p class="text-3xl mb-2">📭</p><p class="text-sm">ยังไม่มีออเดอร์ที่เสร็จสิ้น</p></div>
                 {% endfor %}
             </div>
         </div>
-        {% else %}
-        <div class="text-center py-8 text-gray-400"><p class="text-3xl mb-2">📭</p><p class="text-sm">ยังไม่มีออเดอร์ที่เสร็จสิ้น</p></div>
-        {% endif %}
         <button onclick="closeSalesSummary()" class="mt-5 w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-2.5 rounded-xl text-sm transition">ปิด</button>
+    </div>
+</div>
+
+<div id="purchase-modal" class="hidden fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
+        <div class="flex items-center justify-between mb-5">
+            <div>
+                <h2 class="text-lg font-bold text-gray-800">🧾 รายการที่ต้องซื้อ</h2>
+                <p class="text-xs text-gray-400 mt-0.5">รวมจากใบเช็คของแต่ละเมนู ✕ ออเดอร์ที่ <span class="text-yellow-600 font-semibold">รอดำเนินการ</span> และ <span class="text-blue-600 font-semibold">ยืนยันแล้ว</span></p>
+            </div>
+            <button onclick="closePurchaseList()" class="text-gray-400 hover:text-gray-600 text-xl font-bold leading-none">✕</button>
+        </div>
+
+        {% if shopping_list %}
+        <div class="mb-5">
+            <h3 class="text-sm font-bold text-gray-700 mb-3">📦 สรุปรวมที่ต้องซื้อ</h3>
+            <div class="space-y-2">
+                {% for ing in shopping_list %}
+                <label class="flex items-center justify-between bg-amber-50 border border-amber-100 rounded-xl px-4 py-3 cursor-pointer">
+                    <span class="flex items-center gap-2 text-sm font-medium text-gray-800">
+                        <input type="checkbox" class="w-4 h-4 accent-amber-600 shrink-0">
+                        {{ ing.name }}
+                    </span>
+                    <span class="text-sm font-bold text-amber-700 shrink-0">{{ ing.qty|floatformat:"-2" }}{% if ing.unit %} {{ ing.unit }}{% endif %}</span>
+                </label>
+                {% endfor %}
+            </div>
+        </div>
+
+        <hr class="my-4 border-gray-100">
+
+        <h3 class="text-sm font-bold text-gray-700 mb-3">🍰 แยกตามเมนู</h3>
+        <div class="space-y-3">
+            {% for menu in shopping_breakdown %}
+            <div class="bg-gray-50 rounded-xl px-4 py-3">
+                <p class="text-sm font-bold text-gray-800 mb-2">{{ menu.product_name }} <span class="text-xs text-gray-400 font-normal">({{ menu.qty_needed }} ชิ้น)</span></p>
+                <ul class="space-y-1">
+                    {% for ing in menu.ingredients %}
+                    <li class="text-xs text-gray-500 flex justify-between"><span>• {{ ing.name }}</span><span>{{ ing.qty|floatformat:"-2" }}{% if ing.unit %} {{ ing.unit }}{% endif %}</span></li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center py-8 text-gray-400">
+            <p class="text-3xl mb-2">📭</p>
+            <p class="text-sm">ยังไม่มีรายการต้องซื้อ</p>
+            <p class="text-xs mt-1">ลองไปเพิ่ม "วัตถุดิบ/อุปกรณ์/แพ็คเกจจิ้ง" ให้เมนูในหน้าจัดการสินค้าก่อนนะ</p>
+        </div>
+        {% endif %}
+
+        <button onclick="closePurchaseList()" class="mt-5 w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-2.5 rounded-xl text-sm transition">ปิด</button>
     </div>
 </div>
 
@@ -371,6 +459,17 @@
                 </div>
                 <div id="promos-container" class="space-y-2"></div>
             </div>
+
+            <hr class="my-4 border-gray-100">
+
+            <div>
+                <div class="flex items-center justify-between mb-3">
+                    <label class="font-bold text-gray-700 text-sm">🧾 วัตถุดิบ/อุปกรณ์/แพ็คเกจจิ้ง</label>
+                    <button type="button" onclick="addIngredientRow()" class="text-xs bg-emerald-100 text-emerald-700 px-2 py-1.5 rounded hover:bg-emerald-200 font-semibold">+ เพิ่มรายการ</button>
+                </div>
+                <p class="text-xs text-gray-400 mb-2">ใส่ทุกอย่างที่ใช้ทำเมนูนี้ "ต่อ 1 ชิ้น" ตั้งแต่วัตถุดิบยันแพ็คเกจจิ้ง ระบบจะช่วยรวมยอดที่ต้องซื้อให้อัตโนมัติตอนมีออเดอร์เข้ามา</p>
+                <div id="ingredients-container" class="space-y-2"></div>
+            </div>
             
         </div> 
         <div class="flex gap-3 pt-4 border-t mt-auto shrink-0">
@@ -424,11 +523,86 @@
 
 <script>
 const csrfToken = '{{ csrf_token }}';
+const doneOrdersData = {{ done_orders_json|safe }};
 
 function openSalesSummary() { document.getElementById('sales-modal').classList.remove('hidden'); }
 function closeSalesSummary() { document.getElementById('sales-modal').classList.add('hidden'); }
 function openTodoSummary() { document.getElementById('todo-modal').classList.remove('hidden'); }
 function closeTodoSummary() { document.getElementById('todo-modal').classList.add('hidden'); }
+function openPurchaseList() { document.getElementById('purchase-modal').classList.remove('hidden'); }
+function closePurchaseList() { document.getElementById('purchase-modal').classList.add('hidden'); }
+
+/* ─── สรุปยอดขาย: ติ๊กเลือกออเดอร์ที่ต้องการรวมยอด (เหมือนเลือกของในตะกร้า) ─── */
+function toggleSelectAllSales(checkboxEl) {
+    document.querySelectorAll('.sales-order-check').forEach(cb => cb.checked = checkboxEl.checked);
+    recalcSalesSummary();
+}
+
+function recalcSalesSummary() {
+    const checkedIds = Array.from(document.querySelectorAll('.sales-order-check:checked')).map(cb => parseInt(cb.value));
+    const allCheckboxes = document.querySelectorAll('.sales-order-check');
+    document.getElementById('sales-select-all').checked = allCheckboxes.length > 0 && checkedIds.length === allCheckboxes.length;
+
+    let grandTotal = 0;
+    let orderCount = 0;
+    const productMap = {};
+
+    doneOrdersData.forEach(o => {
+        if (!checkedIds.includes(o.id)) return;
+        orderCount++;
+        grandTotal += o.total;
+
+        // ✅ กระจายส่วนลดรวมของออเดอร์ตามสัดส่วนราคาของแต่ละรายการ
+        // เพื่อให้ยอดต่อเมนูบวกกันแล้ว "ตรงกับยอดสุทธิของออเดอร์เป๊ะ" ไม่เกินยอดจริงเหมือนเดิม
+        const rawSum = o.items.reduce((s, it) => s + it.price * it.qty, 0);
+        o.items.forEach(it => {
+            const raw = it.price * it.qty;
+            const adjusted = rawSum > 0 ? (raw / rawSum) * o.total : 0;
+            if (!productMap[it.name]) productMap[it.name] = { qty: 0, revenue: 0 };
+            productMap[it.name].qty += it.qty;
+            productMap[it.name].revenue += adjusted;
+        });
+    });
+
+    document.getElementById('sales-grand-total').textContent = '฿' + Math.round(grandTotal).toLocaleString();
+    document.getElementById('sales-order-count').textContent = orderCount;
+
+    const listDiv = document.getElementById('sales-product-list');
+    const rows = Object.entries(productMap).sort((a, b) => b[1].qty - a[1].qty);
+    if (rows.length === 0) {
+        listDiv.innerHTML = `<div class="text-center py-8 text-gray-400"><p class="text-3xl mb-2">📭</p><p class="text-sm">ไม่มีออเดอร์ที่เลือก</p></div>`;
+    } else {
+        listDiv.innerHTML = rows.map(([name, d]) => `
+            <div class="flex items-center justify-between bg-gray-50 rounded-xl px-4 py-3">
+                <div class="flex items-center gap-2">
+                    <span class="text-base">🧁</span><span class="text-sm font-medium text-gray-800">${name}</span>
+                </div>
+                <div class="flex items-center gap-3 text-right">
+                    <span class="text-xs text-gray-400">${d.qty} ชิ้น</span>
+                    <span class="text-sm font-bold text-amber-700">฿${Math.round(d.revenue).toLocaleString()}</span>
+                </div>
+            </div>`).join('');
+    }
+}
+
+/* ─── วิธีชำระเงิน (เงินสด/โอน) ต่อออเดอร์ ─── */
+async function updatePaymentMethod(orderId, method) {
+    const formData = new FormData();
+    formData.append('payment_method', method);
+    const res = await fetch(`/admin-panel/order/${orderId}/payment-method/`, { method: 'POST', headers: { 'X-CSRFToken': csrfToken }, body: formData });
+    const data = await res.json();
+    if (data.success) {
+        const sel = document.getElementById('pay-method-select-' + orderId);
+        const colorMap = {
+            '':         'bg-gray-50 text-gray-400 border-gray-200',
+            cash:       'bg-emerald-50 text-emerald-700 border-emerald-200',
+            transfer:   'bg-sky-50 text-sky-700 border-sky-200',
+        };
+        sel.className = 'text-xs border rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-400 ' + colorMap[method];
+    } else {
+        alert('เกิดข้อผิดพลาดในการบันทึกวิธีชำระเงิน');
+    }
+}
 
 function switchTab(name) {
     ['products','orders','payment'].forEach(t => {
@@ -624,6 +798,19 @@ function togglePromoInputs(selectEl) {
     }
 }
 
+function addIngredientRow(name = '', qty = '', unit = '') {
+    const container = document.getElementById('ingredients-container');
+    const row = document.createElement('div');
+    row.className = 'flex gap-2 ingredient-row items-center';
+    row.innerHTML = `
+        <input type="text" placeholder="เช่น แป้งสาลี, ไข่ไก่, กล่องใส่ขนม" value="${name}" class="ingredient-name flex-1 border rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-amber-400 focus:outline-none">
+        <input type="number" step="0.01" min="0" placeholder="ปริมาณ/ชิ้น" value="${qty}" class="ingredient-qty w-24 border rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-amber-400 focus:outline-none">
+        <input type="text" placeholder="หน่วย" value="${unit}" class="ingredient-unit w-20 border rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-amber-400 focus:outline-none">
+        <button onclick="this.parentElement.remove()" class="text-red-400 hover:text-red-600 font-bold px-1 text-xl leading-none">×</button>
+    `;
+    container.appendChild(row);
+}
+
 function openModal(title = 'เพิ่มสินค้า') {
     document.getElementById('modal-title').textContent = title;
     document.getElementById('modal').classList.remove('hidden');
@@ -639,6 +826,7 @@ function closeModal() {
     document.getElementById('img-preview-wrap').classList.add('hidden');
     document.getElementById('skus-container').innerHTML = '';
     document.getElementById('promos-container').innerHTML = '';
+    document.getElementById('ingredients-container').innerHTML = '';
 }
 
 function previewImage(event) {
@@ -700,8 +888,16 @@ async function saveProduct() {
         return { min_quantity: qty, promo_type: ptype, special_price: price || null, discount: discount || null };
     }).filter(p => p.min_quantity && (p.special_price || p.discount));
 
+    const ingredients = Array.from(document.querySelectorAll('.ingredient-row')).map(row => {
+        const name = row.querySelector('.ingredient-name').value.trim();
+        const qty  = row.querySelector('.ingredient-qty').value.trim();
+        const unit = row.querySelector('.ingredient-unit').value.trim();
+        return { name: name, quantity: qty || 1, unit: unit };
+    }).filter(i => i.name);
+
     formData.append('skus', JSON.stringify(skus));
     formData.append('promos', JSON.stringify(promos));
+    formData.append('ingredients', JSON.stringify(ingredients));
 
     const url = id ? `/admin-panel/edit/${id}/` : '/admin-panel/add/';
     const res = await fetch(url, { method: 'POST', headers: { 'X-CSRFToken': csrfToken }, body: formData });
@@ -742,6 +938,11 @@ async function editProduct(id) {
     document.getElementById('promos-container').innerHTML = '';
     if(data.promos && data.promos.length > 0) {
         data.promos.forEach(p => addPromoRow(p.min_quantity, p.promo_type || 'special_price', p.special_price || '', p.discount || ''));
+    }
+
+    document.getElementById('ingredients-container').innerHTML = '';
+    if(data.ingredients && data.ingredients.length > 0) {
+        data.ingredients.forEach(i => addIngredientRow(i.name, i.quantity, i.unit));
     }
 
     openModal('แก้ไขสินค้า');
