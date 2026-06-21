@@ -2,7 +2,6 @@
 {% block title %}จัดการร้าน - ภัทรา Homemade{% endblock %}
 
 {% block extra_head %}
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 {% endblock %}
 
@@ -342,11 +341,11 @@
 
         <!-- ✅ ปุ่ม Export + ปิด -->
         <div class="export-btn-wrap flex gap-2 mt-5">
-            <button onclick="exportToPNG('sales-export-area', 'สรุปยอดขาย')"
+            <button onclick="exportSales('png')"
                     class="flex-1 bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2.5 rounded-xl text-sm transition">
                 🖼️ บันทึกรูป
             </button>
-            <button onclick="exportToPDF('sales-export-area', 'สรุปยอดขาย')"
+            <button onclick="exportSales('pdf')"
                     class="flex-1 bg-rose-500 hover:bg-rose-600 text-white font-semibold py-2.5 rounded-xl text-sm transition">
                 📄 บันทึก PDF
             </button>
@@ -426,7 +425,8 @@
             {% if todo_summary %}
             <div class="space-y-2">
                 {% for item in todo_summary %}
-                <div class="flex items-center justify-between bg-amber-50 border border-amber-100 rounded-xl px-4 py-3">
+                <div class="flex items-center justify-between bg-amber-50 border border-amber-100 rounded-xl px-4 py-3"
+                     data-todo-name="{{ item.product_name }}" data-todo-qty="{{ item.total_qty }}">
                     <div class="flex items-center gap-2">
                         <span class="text-base">🧁</span><span class="text-sm font-bold text-gray-800">{{ item.product_name }}</span>
                     </div>
@@ -448,11 +448,11 @@
 
         <!-- ✅ ปุ่ม Export + ปิด -->
         <div class="export-btn-wrap flex gap-2 mt-5">
-            <button onclick="exportToPNG('todo-export-area', 'ยอดต้องทำ')"
+            <button onclick="exportTodo('png')"
                     class="flex-1 bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2.5 rounded-xl text-sm transition">
                 🖼️ บันทึกรูป
             </button>
-            <button onclick="exportToPDF('todo-export-area', 'ยอดต้องทำ')"
+            <button onclick="exportTodo('pdf')"
                     class="flex-1 bg-rose-500 hover:bg-rose-600 text-white font-semibold py-2.5 rounded-xl text-sm transition">
                 📄 บันทึก PDF
             </button>
@@ -558,61 +558,246 @@
 const csrfToken = '{{ csrf_token }}';
 const doneOrdersData = {{ done_orders_json|safe }};
 
-/* ════════════════ EXPORT FUNCTIONS ════════════════ */
-async function exportToPNG(elementId, filename) {
-    const el = document.getElementById(elementId);
-    const btnWrap = el.closest('.bg-white, .rounded-2xl').querySelector('.export-btn-wrap');
-    if (btnWrap) btnWrap.style.display = 'none';
-    try {
-        const canvas = await html2canvas(el, {
-            scale: 2,
-            useCORS: true,
-            backgroundColor: '#ffffff',
-            logging: false,
-        });
-        const link = document.createElement('a');
-        link.download = filename + '.png';
-        link.href = canvas.toDataURL('image/png');
-        link.click();
-    } catch(e) {
-        alert('บันทึกรูปไม่สำเร็จ: ' + e.message);
-    } finally {
-        if (btnWrap) btnWrap.style.display = '';
-    }
+/* ════════════════ CANVAS REPORT RENDERER ════════════════ */
+const SHOP_NAME = 'ภัทรา Homemade';
+const FONT_STACK = "'Noto Sans Thai','Leelawadee UI','Tahoma',sans-serif";
+
+const REPORT_COLORS = {
+    amberDark: '#92400e',
+    amber: '#d97706',
+    amberLight: '#fef3c7',
+    rowAlt: '#fffbeb',
+    text: '#374151',
+    textMuted: '#9ca3af',
+    border: '#f1ebe0',
+    white: '#ffffff',
+};
+
+function getReportDateStr() {
+    const now = new Date();
+    const datePart = now.toLocaleDateString('th-TH', { day: '2-digit', month: 'long', year: 'numeric' });
+    const timePart = now.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+    return `วันที่ ${datePart} เวลา ${timePart} น.`;
 }
 
-async function exportToPDF(elementId, filename) {
-    const el = document.getElementById(elementId);
-    const btnWrap = el.closest('.bg-white, .rounded-2xl').querySelector('.export-btn-wrap');
-    if (btnWrap) btnWrap.style.display = 'none';
-    try {
-        const canvas = await html2canvas(el, {
-            scale: 2,
-            useCORS: true,
-            backgroundColor: '#ffffff',
-            logging: false,
+// Draws a clean branded report onto a freshly-created canvas (no DOM screenshotting).
+function drawReportCanvas({ reportTitle, reportIcon, subtitle, columns, rows, totals }) {
+    const scale = 2;
+    const width = 720;
+    const padX = 32;
+    const headerHeight = 118;
+    const tableHeaderHeight = 38;
+    const rowHeight = 42;
+    const footerHeight = totals ? 64 : 16;
+    const bodyHeight = rows.length > 0 ? rows.length * rowHeight : 70;
+    const height = headerHeight + tableHeaderHeight + bodyHeight + footerHeight + 20;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = width * scale;
+    canvas.height = height * scale;
+    const ctx = canvas.getContext('2d');
+    ctx.scale(scale, scale);
+    ctx.textBaseline = 'middle';
+
+    // background
+    ctx.fillStyle = REPORT_COLORS.white;
+    ctx.fillRect(0, 0, width, height);
+
+    // ---- header ----
+    ctx.fillStyle = REPORT_COLORS.amberDark;
+    ctx.font = `700 22px ${FONT_STACK}`;
+    ctx.textAlign = 'left';
+    ctx.fillText(`🧁 ${SHOP_NAME}`, padX, 34);
+
+    ctx.fillStyle = REPORT_COLORS.amber;
+    ctx.font = `700 16px ${FONT_STACK}`;
+    ctx.fillText(`${reportIcon} ${reportTitle}`, padX, 62);
+
+    ctx.fillStyle = REPORT_COLORS.textMuted;
+    ctx.font = `400 12px ${FONT_STACK}`;
+    if (subtitle) ctx.fillText(subtitle, padX, 84);
+    ctx.fillText(getReportDateStr(), padX, 100);
+
+    // divider
+    ctx.strokeStyle = REPORT_COLORS.amber;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(padX, headerHeight - 8);
+    ctx.lineTo(width - padX, headerHeight - 8);
+    ctx.stroke();
+
+    // ---- table header ----
+    let y = headerHeight;
+    ctx.fillStyle = REPORT_COLORS.amberLight;
+    ctx.fillRect(padX, y, width - padX * 2, tableHeaderHeight);
+    ctx.fillStyle = REPORT_COLORS.amberDark;
+    ctx.font = `700 13px ${FONT_STACK}`;
+    columns.forEach(col => {
+        ctx.textAlign = col.align || 'left';
+        const tx = col.align === 'right' ? col.x + col.width - 10 : col.x + 10;
+        ctx.fillText(col.label, tx, y + tableHeaderHeight / 2);
+    });
+    y += tableHeaderHeight;
+
+    // ---- rows ----
+    if (rows.length === 0) {
+        ctx.fillStyle = REPORT_COLORS.textMuted;
+        ctx.font = `400 13px ${FONT_STACK}`;
+        ctx.textAlign = 'center';
+        ctx.fillText('ไม่มีข้อมูล', width / 2, y + 35);
+        y += 70;
+    } else {
+        rows.forEach((row, i) => {
+            if (i % 2 === 1) {
+                ctx.fillStyle = REPORT_COLORS.rowAlt;
+                ctx.fillRect(padX, y, width - padX * 2, rowHeight);
+            }
+            columns.forEach(col => {
+                ctx.fillStyle = col.color || REPORT_COLORS.text;
+                ctx.font = `${col.bold ? '700' : '400'} 13px ${FONT_STACK}`;
+                ctx.textAlign = col.align || 'left';
+                const tx = col.align === 'right' ? col.x + col.width - 10 : col.x + 10;
+                ctx.fillText(String(row[col.key] ?? ''), tx, y + rowHeight / 2);
+            });
+            ctx.strokeStyle = REPORT_COLORS.border;
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(padX, y + rowHeight);
+            ctx.lineTo(width - padX, y + rowHeight);
+            ctx.stroke();
+            y += rowHeight;
         });
-        const { jsPDF } = window.jspdf;
-        const imgData = canvas.toDataURL('image/png');
-        const pxW = canvas.width;
-        const pxH = canvas.height;
-        const mmW = 210; // A4
-        const mmH = Math.round((pxH / pxW) * mmW);
-        const orientation = mmH > 297 ? 'portrait' : 'portrait';
-        const pdf = new jsPDF({ orientation, unit: 'mm', format: 'a4' });
-        const pageH = pdf.internal.pageSize.getHeight();
-        let offset = 0;
-        while (offset < mmH) {
-            if (offset > 0) pdf.addPage();
-            pdf.addImage(imgData, 'PNG', 0, -offset, mmW, mmH);
-            offset += pageH;
-        }
-        pdf.save(filename + '.pdf');
-    } catch(e) {
-        alert('บันทึก PDF ไม่สำเร็จ: ' + e.message);
-    } finally {
-        if (btnWrap) btnWrap.style.display = '';
     }
+
+    // ---- footer / totals ----
+    if (totals) {
+        y += 10;
+        ctx.fillStyle = REPORT_COLORS.amberLight;
+        ctx.fillRect(padX, y, width - padX * 2, footerHeight - 16);
+        ctx.fillStyle = REPORT_COLORS.amberDark;
+        ctx.font = `700 14px ${FONT_STACK}`;
+        ctx.textAlign = 'left';
+        ctx.fillText(totals.label, padX + 16, y + (footerHeight - 16) / 2);
+        ctx.font = `700 18px ${FONT_STACK}`;
+        ctx.textAlign = 'right';
+        ctx.fillText(totals.value, width - padX - 16, y + (footerHeight - 16) / 2);
+    }
+
+    ctx.textAlign = 'left';
+    return canvas;
+}
+
+function canvasToPNGDownload(canvas, filename) {
+    const link = document.createElement('a');
+    link.download = filename + '.png';
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+}
+
+function canvasToPDFDownload(canvas, filename) {
+    const { jsPDF } = window.jspdf;
+    const imgData = canvas.toDataURL('image/png');
+    const pxW = canvas.width, pxH = canvas.height;
+    const mmW = 180;
+    const mmH = (pxH / pxW) * mmW;
+    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const pageH = pdf.internal.pageSize.getHeight() - 30;
+    if (mmH <= pageH) {
+        pdf.addImage(imgData, 'PNG', 15, 15, mmW, mmH);
+    } else {
+        // paginate tall reports across multiple A4 pages
+        let renderedMM = 0;
+        const pxPerMM = pxH / mmH;
+        while (renderedMM < mmH) {
+            const sliceHeightMM = Math.min(pageH, mmH - renderedMM);
+            const sliceCanvas = document.createElement('canvas');
+            sliceCanvas.width = pxW;
+            sliceCanvas.height = sliceHeightMM * pxPerMM;
+            const sctx = sliceCanvas.getContext('2d');
+            sctx.drawImage(canvas, 0, renderedMM * pxPerMM, pxW, sliceCanvas.height, 0, 0, pxW, sliceCanvas.height);
+            if (renderedMM > 0) pdf.addPage();
+            pdf.addImage(sliceCanvas.toDataURL('image/png'), 'PNG', 15, 15, mmW, sliceHeightMM);
+            renderedMM += sliceHeightMM;
+        }
+    }
+    pdf.save(filename + '.pdf');
+}
+
+/* ---- sales report: build data + export ---- */
+function buildSalesReportCanvas() {
+    const checkedIds = Array.from(document.querySelectorAll('.sales-order-check:checked')).map(cb => parseInt(cb.value));
+    let grandTotal = 0, orderCount = 0;
+    const productMap = {};
+
+    doneOrdersData.forEach(o => {
+        if (!checkedIds.includes(o.id)) return;
+        orderCount++;
+        grandTotal += o.total;
+        const rawSum = o.items.reduce((s, it) => s + it.price * it.qty, 0);
+        o.items.forEach(it => {
+            const raw = it.price * it.qty;
+            const adjusted = rawSum > 0 ? (raw / rawSum) * o.total : 0;
+            if (!productMap[it.name]) productMap[it.name] = { qty: 0, revenue: 0 };
+            productMap[it.name].qty += it.qty;
+            productMap[it.name].revenue += adjusted;
+        });
+    });
+
+    const rows = Object.entries(productMap)
+        .sort((a, b) => b[1].qty - a[1].qty)
+        .map(([name, d]) => ({
+            name: name,
+            qty: `${d.qty} ชิ้น`,
+            revenue: `฿${Math.round(d.revenue).toLocaleString()}`,
+        }));
+
+    return drawReportCanvas({
+        reportTitle: 'สรุปยอดขาย',
+        reportIcon: '📊',
+        subtitle: `เฉพาะออเดอร์ที่เสร็จสิ้นแล้ว (${orderCount} ออเดอร์ที่เลือก)`,
+        columns: [
+            { key: 'name', label: 'สินค้า', x: 32, width: 360, align: 'left' },
+            { key: 'qty', label: 'จำนวน', x: 392, width: 100, align: 'right' },
+            { key: 'revenue', label: 'ยอดขาย', x: 492, width: 196, align: 'right', bold: true, color: REPORT_COLORS.amberDark },
+        ],
+        rows,
+        totals: { label: 'ยอดขายรวม', value: `฿${Math.round(grandTotal).toLocaleString()}` },
+    });
+}
+
+function exportSales(format) {
+    const canvas = buildSalesReportCanvas();
+    if (format === 'png') canvasToPNGDownload(canvas, 'สรุปยอดขาย');
+    else canvasToPDFDownload(canvas, 'สรุปยอดขาย');
+}
+
+/* ---- todo report: build data + export ---- */
+function buildTodoReportCanvas() {
+    const items = Array.from(document.querySelectorAll('#todo-export-area [data-todo-name]')).map(el => ({
+        name: el.dataset.todoName,
+        qty: el.dataset.todoQty,
+    }));
+    const total = items.reduce((s, it) => s + parseInt(it.qty || 0), 0);
+
+    const rows = items.map(it => ({ name: it.name, qty: `${it.qty} ชิ้น` }));
+
+    return drawReportCanvas({
+        reportTitle: 'ยอดขนมที่ต้องทำ',
+        reportIcon: '📋',
+        subtitle: 'รวมจากสถานะ รอดำเนินการ และ ยืนยันแล้ว',
+        columns: [
+            { key: 'name', label: 'สินค้า', x: 32, width: 460, align: 'left' },
+            { key: 'qty', label: 'จำนวนที่ต้องทำ', x: 492, width: 196, align: 'right', bold: true, color: REPORT_COLORS.amberDark },
+        ],
+        rows,
+        totals: { label: 'รวมทั้งหมด', value: `${total} ชิ้น` },
+    });
+}
+
+function exportTodo(format) {
+    const canvas = buildTodoReportCanvas();
+    if (format === 'png') canvasToPNGDownload(canvas, 'ยอดต้องทำ');
+    else canvasToPDFDownload(canvas, 'ยอดต้องทำ');
 }
 
 /* ════════════════ MODAL FUNCTIONS ════════════════ */
