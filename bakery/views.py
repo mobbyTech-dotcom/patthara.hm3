@@ -4,10 +4,17 @@ from django.contrib.auth import authenticate, login, logout
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
 from django.db.models import Sum, Count, F, ExpressionWrapper, IntegerField as IntField
+from collections import OrderedDict
+from decimal import Decimal
 
-from .models import Product, Order, OrderItem, PaymentInfo, ProductSKU, Promotion
+from .models import Product, Order, OrderItem, PaymentInfo, ProductSKU, Promotion, ProductIngredient
 from .forms import ProductForm
 import json
+
+# ✅ ชื่อที่เก็บใน OrderItem จะเป็น "ชื่อสินค้า (ชื่อ SKU)" เช่น "บราวนี่ (ช็อกโกแลต)"
+# ฟังก์ชันนี้ใช้ตัดเอาแค่ชื่อสินค้าจริงๆ กลับมา เพื่อไปหารายการวัตถุดิบ (ProductIngredient) ของสินค้านั้น
+def get_base_product_name(display_name):
+    return display_name.split(' (')[0].strip()
 
 def get_products_json():
     products = Product.objects.filter(is_available=True).prefetch_related('skus', 'promotions')
@@ -118,7 +125,7 @@ def logout_view(request):
 
 @login_required
 def admin_panel(request):
-    products = Product.objects.all()
+    products = Product.objects.all().prefetch_related('ingredients')
     orders   = Order.objects.prefetch_related('items').all()
     form     = ProductForm()
     payment  = PaymentInfo.get_singleton()
@@ -126,17 +133,40 @@ def admin_panel(request):
     pending_count = Order.objects.filter(status='pending').count()
     confirmed_count = Order.objects.filter(status='confirmed').count()
     active_orders_count = pending_count + confirmed_count
-    
-    done_orders = Order.objects.filter(status='done')
-    sales_total = done_orders.aggregate(total=Sum('total'))['total'] or 0
-    done_count  = done_orders.count()
 
-    product_summary_list = list(
-        OrderItem.objects
-        .filter(order__status='done')
-        .values('product_name')
-        .annotate(total_qty=Sum('quantity'), total_revenue=Sum(ExpressionWrapper(F('price') * F('quantity'), output_field=IntField())))
-        .order_by('-total_qty')
+    # ───────────────────────────────────────────────────────────────
+    # ✅ สรุปยอดขาย: คิดยอดจาก order.total ของแต่ละออเดอร์ตรงๆ (ค่านี้หักส่วนลดไว้แล้วตั้งแต่ตอนสร้างออเดอร์)
+    # แทนการ Sum(price * quantity) ของ OrderItem ตรงๆ ซึ่งไม่ได้หักส่วนลดรวม (โปรแบบ "ส่วนลดรวม บาท")
+    # ทำให้ก่อนหน้านี้ยอดรวมในสินค้าที่ขายได้ "เกิน" ยอดขายจริง
+    # ส่วนลดของแต่ละออเดอร์จะถูกเฉลี่ยคืนไปตามสัดส่วนราคาในแต่ละ item เพื่อให้ยอดต่อเมนู บวกกันแล้วตรงกับยอดรวมพอดี
+    done_orders = Order.objects.filter(status='done').prefetch_related('items')
+    done_count  = done_orders.count()
+    sales_total = sum(o.total for o in done_orders)
+
+    product_revenue   = OrderedDict()
+    done_orders_data  = []
+    for o in done_orders:
+        items = list(o.items.all())
+        raw_sum = sum(it.price * it.quantity for it in items)
+        row_items = []
+        for it in items:
+            raw = it.price * it.quantity
+            adjusted = (raw / raw_sum * o.total) if raw_sum > 0 else 0
+            row_items.append({'name': it.product_name, 'qty': it.quantity, 'price': it.price})
+            entry = product_revenue.setdefault(it.product_name, {'total_qty': 0, 'total_revenue': 0})
+            entry['total_qty']     += it.quantity
+            entry['total_revenue'] += adjusted
+        done_orders_data.append({
+            'id': o.id,
+            'order_number': o.order_number,
+            'customer_name': o.customer_name,
+            'total': o.total,
+            'items': row_items,
+        })
+
+    product_summary_list = sorted(
+        [{'product_name': k, 'total_qty': v['total_qty'], 'total_revenue': round(v['total_revenue'])} for k, v in product_revenue.items()],
+        key=lambda x: -x['total_qty']
     )
 
     todo_summary_list = list(
@@ -145,6 +175,34 @@ def admin_panel(request):
         .values('product_name')
         .annotate(total_qty=Sum('quantity'))
         .order_by('-total_qty')
+    )
+
+    # ───────────────────────────────────────────────────────────────
+    # ✅ รายการที่ต้องซื้อ: รวมวัตถุดิบ/อุปกรณ์/แพ็คเกจจิ้งจากใบเช็คของแต่ละเมนู (ProductIngredient)
+    # คูณด้วยจำนวนที่ต้องทำ (ออเดอร์ที่ยังไม่เสร็จ) แล้วรวมยอดทั้งหมดที่ต้องซื้อ
+    shopping_breakdown = []
+    shopping_totals     = OrderedDict()
+    for item in todo_summary_list:
+        base_name  = get_base_product_name(item['product_name'])
+        qty_needed = item['total_qty']
+        product = Product.objects.filter(name=base_name).prefetch_related('ingredients').first()
+        if not product:
+            continue
+        ing_rows = []
+        for ing in product.ingredients.all():
+            total_qty = ing.quantity * qty_needed
+            ing_rows.append({'name': ing.name, 'unit': ing.unit, 'qty': total_qty})
+            key = (ing.name, ing.unit)
+            shopping_totals[key] = shopping_totals.get(key, Decimal('0')) + total_qty
+        if ing_rows:
+            shopping_breakdown.append({
+                'product_name': item['product_name'],
+                'qty_needed':   qty_needed,
+                'ingredients':  ing_rows,
+            })
+    shopping_list = sorted(
+        [{'name': k[0], 'unit': k[1], 'qty': v} for k, v in shopping_totals.items()],
+        key=lambda x: x['name']
     )
 
     return render(request, 'bakery/admin.html', {
@@ -157,8 +215,12 @@ def admin_panel(request):
         'active_orders_count':  active_orders_count,
         'sales_total':          sales_total,
         'done_count':           done_count,
+        'done_orders':          done_orders,
+        'done_orders_json':     json.dumps(done_orders_data),
         'product_summary':      product_summary_list,
         'todo_summary':         todo_summary_list,
+        'shopping_breakdown':   shopping_breakdown,
+        'shopping_list':        shopping_list,
     })
 
 @login_required
@@ -170,6 +232,7 @@ def product_add(request):
         try:
             skus = json.loads(request.POST.get('skus', '[]'))
             promos = json.loads(request.POST.get('promos', '[]'))
+            ingredients = json.loads(request.POST.get('ingredients', '[]'))
             
             # ✅ แก้ไขลูปบันทึก SKU ใหม่ให้ดึงรูปตาม index ที่หน้าบ้านส่งมาอย่างถูกต้อง
             for index, item in enumerate(skus):
@@ -190,6 +253,16 @@ def product_add(request):
                     special_price=promo.get('special_price') or 0,
                     discount=promo.get('discount') or 0
                 )
+
+            # ✅ บันทึกใบเช็ครายการวัตถุดิบ/อุปกรณ์/แพ็คเกจจิ้งของเมนูนี้
+            for ing in ingredients:
+                ProductIngredient.objects.create(
+                    product=product,
+                    name=ing['name'],
+                    quantity=ing.get('quantity') or 1,
+                    unit=ing.get('unit', '')
+                )
+
             return JsonResponse({'success': True})
         except Exception as e:
             print("Error saving SKUs/Promos:", e)
@@ -247,6 +320,18 @@ def product_edit(request, pk):
                         special_price=promo.get('special_price') or 0,
                         discount=promo.get('discount') or 0
                     )
+
+                # --- จัดการใบเช็ครายการวัตถุดิบ/อุปกรณ์/แพ็คเกจจิ้ง ---
+                product.ingredients.all().delete()
+                ingredients = json.loads(request.POST.get('ingredients', '[]'))
+                for ing in ingredients:
+                    ProductIngredient.objects.create(
+                        product=product,
+                        name=ing['name'],
+                        quantity=ing.get('quantity') or 1,
+                        unit=ing.get('unit', '')
+                    )
+
                 return JsonResponse({'success': True})
             except Exception as e:
                 print("Error Edit SKU/Promo:", e)
@@ -263,6 +348,7 @@ def product_edit(request, pk):
         'image_url':   product.image.url if product.image else '',
         'skus':        [{'id': s.id, 'name': s.name, 'price': s.price, 'image_url': s.image.url if s.image else ''} for s in product.skus.all()],
         'promos':      list(product.promotions.values('min_quantity', 'promo_type', 'special_price', 'discount')),
+        'ingredients': list(product.ingredients.values('name', 'quantity', 'unit')),
     })
 
 @login_required
@@ -293,6 +379,18 @@ def order_update_status(request, order_id):
         order.save()
         return JsonResponse({'success': True, 'status': status, 'label': order.status_label})
     return JsonResponse({'success': False, 'error': 'invalid status'})
+
+# ✅ บันทึกวิธีชำระเงิน (เงินสด/โอนเงิน) ตรงที่ตัวออเดอร์เลย คู่กับช่องสถานะ
+@login_required
+@require_POST
+def order_update_payment_method(request, order_id):
+    order  = get_object_or_404(Order, id=order_id)
+    method = request.POST.get('payment_method', '')
+    if method == '' or method in dict(Order.PAYMENT_METHOD_CHOICES):
+        order.payment_method = method
+        order.save()
+        return JsonResponse({'success': True, 'payment_method': order.payment_method, 'label': order.payment_method_label})
+    return JsonResponse({'success': False, 'error': 'invalid payment method'})
 
 @login_required
 @require_POST
